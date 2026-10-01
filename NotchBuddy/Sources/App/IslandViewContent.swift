@@ -148,14 +148,11 @@ struct EmptyStateView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Nothing running right now.")
                         .font(.system(size: 15, weight: .semibold))
-                    Text("Drop a file or window, or ask me anything.")
+                    Text("Your coding agents show up here. Drop a file to email it.")
                         .font(.system(size: 13))
                         .foregroundColor(Color(hex: "#9398A1"))
                 }
                 Spacer()
-                PrimaryButton("Ask Claude") {
-                    state.view = .prompt
-                }
             }
             .padding(.leading, 118)
             .padding(.trailing, 18)

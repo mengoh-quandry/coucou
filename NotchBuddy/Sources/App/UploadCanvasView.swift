@@ -51,9 +51,9 @@ struct UploadCanvasView: View {
     private func chooseOverlay(f: USFrame) -> some View {
         // Reference positions: button1 x=100 w=176 y=113 h=26, button2 x=284 w=128
         ZStack(alignment: .topLeading) {
-            // Primary: "Ask a question about it"
+            // Single action: "Send by email" (chat removed in this fork)
             Button {
-                withAnimation(.easeInOut(duration: 0.22)) { state.view = .prompt }
+                withAnimation(.easeInOut(duration: 0.22)) { state.view = .mail }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                     UploadSequenceEngine.shared.deactivate()
                 }
@@ -65,21 +65,6 @@ struct UploadCanvasView: View {
             .buttonStyle(.plain)
             .frame(width: 168, height: 26)
             .position(x: 114 + 84, y: 113 + 13)   // center = (198, 126)
-
-            // Secondary: "Send by email"
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) { state.view = .mail }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                    UploadSequenceEngine.shared.deactivate()
-                }
-            } label: {
-                Color.clear
-                    .frame(width: 120, height: 26)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .frame(width: 120, height: 26)
-            .position(x: 290 + 60, y: 113 + 13)   // center = (350, 126)
         }
         .opacity(f.chooseAlpha)
         .allowsHitTesting(f.chooseAlpha > 0.5)
@@ -273,21 +258,13 @@ struct UploadCanvasView: View {
             .foregroundColor(Color(hex:"#9398A1"))
         cCtx.draw(subText, at: CGPoint(x:114, y:100), anchor: .leading)
 
-        // Primary button (white fill)
+        // Single action button (white fill): "Send by email"
         cCtx.fill(roundedRect(CGRect(x:114,y:113,width:168,height:26), r:13),
                   with: .color(Color(hex:"#F5F6F8")))
-        let btn1 = Text("Ask a question about it")
+        let btn1 = Text("Send by email")
             .font(.system(size:12.5, weight:.medium))
             .foregroundColor(Color(red:0.043,green:0.047,blue:0.055))
         cCtx.draw(btn1, at: CGPoint(x:198, y:126), anchor: .center)
-
-        // Secondary button (dim fill)
-        cCtx.fill(roundedRect(CGRect(x:290,y:113,width:120,height:26), r:13),
-                  with: .color(Color.white.opacity(0.09)))
-        let btn2 = Text("Send by email")
-            .font(.system(size:12.5, weight:.medium))
-            .foregroundColor(Color(hex:"#F1F2F4"))
-        cCtx.draw(btn2, at: CGPoint(x:350, y:126), anchor: .center)
     }
 
     // MARK: - Mochi (superellipse body + eyes + mouth)

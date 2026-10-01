@@ -35,7 +35,6 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 - ✅ **Approve from the notch** — permission requests show up with **Allow / Deny**. One click, back to work. Works for Claude Code and Codex.
 - 🧑‍💻 **Jump to the right terminal** — open the terminal window of a session.
 - 📎 **Drop a file on the notch** — Mochi turns into a box and swallows it, then send it by email via Mail.app.
-- 🪟 **Drag Mochi onto any window** — attach that window as context.
 - 🎭 **A real character** — idle breathing, blinks, eyes on a sphere that follow your mouse, emotes, 28 handcrafted sounds, a greeting on launch.
 - 🫥 **Invisible when idle** — hides away when nothing is running, peeks out when you hover the notch.
 - 🖥️ **Any Mac, notch or not** — on an iMac, Mac mini, or a closed-lid MacBook on an external display, Mochi sits in a small bar at the top of the screen.

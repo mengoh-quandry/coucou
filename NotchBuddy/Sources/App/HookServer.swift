@@ -1042,8 +1042,12 @@ final class HookServer: @unchecked Sendable {
         let base = hookBase()
         // (Codex event name, timeout in seconds). PermissionRequest blocks while the
         // user approves from the notch, so it gets a long timeout like Claude Code's.
+        // Timeouts are in seconds (same as Claude Code). Codex defaults omitted
+        // hooks to 600 s, except SessionEnd which defaults to 1 s and supports at
+        // most 3 s — so SessionEnd gets 3, not 10. The relay is fire-and-forget on
+        // everything except PermissionRequest, which blocks while you approve.
         let events: [(String, Int)] = [
-            ("SessionStart", 10), ("SessionEnd", 10),
+            ("SessionStart", 10), ("SessionEnd", 3),
             ("UserPromptSubmit", 10),
             ("PreToolUse", 10), ("PostToolUse", 10),
             ("PermissionRequest", 120),
