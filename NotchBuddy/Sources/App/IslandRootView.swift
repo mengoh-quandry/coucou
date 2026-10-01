@@ -13,6 +13,7 @@ struct IslandRootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             IslandContainer(state: state)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .offset(x: state.islandXOffset)
         }
         .ignoresSafeArea()
     }
@@ -53,10 +54,21 @@ struct IslandContainer: View {
         let greetingActive = state.mode == .expanded && state.view == .greeting
 
         return ZStack(alignment: .topLeading) {
-            // Black island shape
-            IslandShape(width: islandWidth, height: islandHeight,
-                        cornerRadius: cornerRadius, topRadius: islandTopRadius)
-                .fill(Color.black)
+            // Island background: Liquid Glass (macOS 26) or opaque black.
+            // When glass is on, the shape morphs fluidly as width/height animate on
+            // expand/collapse, giving the iPad-style liquid feel.
+            if state.liquidGlass {
+                IslandShape(width: islandWidth, height: islandHeight,
+                            cornerRadius: cornerRadius, topRadius: islandTopRadius)
+                    .fill(.clear)
+                    .glassEffect(.regular.tint(Color.black.opacity(0.45)),
+                                 in: IslandShape(width: islandWidth, height: islandHeight,
+                                                 cornerRadius: cornerRadius, topRadius: islandTopRadius))
+            } else {
+                IslandShape(width: islandWidth, height: islandHeight,
+                            cornerRadius: cornerRadius, topRadius: islandTopRadius)
+                    .fill(Color.black)
+            }
 
             // Content
             if state.mode == .expanded {

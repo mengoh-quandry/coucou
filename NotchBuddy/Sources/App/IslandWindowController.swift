@@ -248,6 +248,10 @@ final class IslandWindowController: NSWindowController {
                 NotificationCenter.default.post(name: .greetingHover, object: nil)
             }
             fsm.mouseEntered()
+            // Option: expand fully on hover instead of just peeking.
+            if state.expandOnHover, fsm.state != .coucou, state.mode != .expanded {
+                fsm.click()
+            }
         }
         if !inIsland && wasInIsland {
             fsm.mouseLeft()
@@ -812,7 +816,7 @@ final class IslandPanel: NSPanel {
         } else {
             h = fixedH
         }
-        return CGRect(x: (frame.width - w) / 2, y: frame.height - h, width: w, height: h)
+        return CGRect(x: (frame.width - w) / 2 + s.islandXOffset, y: frame.height - h, width: w, height: h)
     }
 }
 

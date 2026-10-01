@@ -249,6 +249,26 @@ struct SettingsView: View {
                     .padding(6)
                 }
 
+                // MARK: Island appearance & behavior
+                GroupBox("Island") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("Liquid Glass", isOn: $state.liquidGlass)
+                        Toggle("Expand on hover (not just peek)", isOn: $state.expandOnHover)
+                        HStack(spacing: 8) {
+                            Text("Position")
+                                .frame(width: 64, alignment: .leading)
+                            Slider(value: $state.islandXOffset, in: -400...400, step: 1)
+                            Button("Center") { state.islandXOffset = 0 }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
+                        Text("Horizontal offset from the notch (0 = centered). Best as a nudge; the physical notch stays centered.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(6)
+                }
+
                 // MARK: Hotkey
                 GroupBox("Hotkey") {
                     VStack(alignment: .leading, spacing: 10) {

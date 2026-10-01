@@ -110,6 +110,21 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(Int(hotkeyCode), forKey: "hotkeyCode") }
     }
 
+    // Expand the island on hover, not just peek — persisted
+    @Published var expandOnHover: Bool = false {
+        didSet { UserDefaults.standard.set(expandOnHover, forKey: "expandOnHover") }
+    }
+
+    // Horizontal offset of the island from notch center, in points — persisted
+    @Published var islandXOffset: CGFloat = 0 {
+        didSet { UserDefaults.standard.set(Double(islandXOffset), forKey: "islandXOffset") }
+    }
+
+    // Liquid Glass styling (macOS 26) instead of the opaque dark island — persisted
+    @Published var liquidGlass: Bool = true {
+        didSet { UserDefaults.standard.set(liquidGlass, forKey: "liquidGlass") }
+    }
+
     // Pending approval request from a coding-agent hook (Claude Code / Codex / …)
     @Published var pendingApproval: ApprovalInfo? = nil
 
@@ -129,6 +144,9 @@ final class AppState: ObservableObject {
         if let v = ud.object(forKey: "hotkeyEnabled") as? Bool  { hotkeyEnabled = v }
         if let v = ud.object(forKey: "hotkeyFlags")   as? Int   { hotkeyFlags = UInt(v) }
         if let v = ud.object(forKey: "hotkeyCode")    as? Int   { hotkeyCode = UInt16(v) }
+        if let v = ud.object(forKey: "expandOnHover") as? Bool  { expandOnHover = v }
+        if let v = ud.object(forKey: "islandXOffset") as? Double { islandXOffset = CGFloat(v) }
+        if let v = ud.object(forKey: "liquidGlass")   as? Bool  { liquidGlass = v }
 
         // Sync SoundEngine volume on launch
         SoundEngine.shared.volume = Float(soundVolume)
