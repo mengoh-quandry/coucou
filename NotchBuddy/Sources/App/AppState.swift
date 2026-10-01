@@ -9,7 +9,7 @@ import Combine
 extension AgentTask {
     /// Built-in pills. Only Claude Code is always active; there are no cloud integrations.
     static let integrationAgents: [AgentTask] = [
-        AgentTask(id: "integration_claude",  name: "VS Code",   color: "#F5F6F8", state: .idle, steps: [], source: .claudeCode, isIntegration: true),
+        AgentTask(id: "integration_claude",  name: "Claude Code", color: "#F5F6F8", state: .idle, steps: [], source: .claudeCode, isIntegration: true),
     ]
 
     /// IDs that can be toggled. None — the Claude Code pill is always on and
