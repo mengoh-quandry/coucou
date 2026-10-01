@@ -39,6 +39,7 @@ final class HookServer: @unchecked Sendable {
     private var connectionCount = 0
     private var pendingApprovalFD: Int32 = -1   // held open while user decides
     private var activeSessionId: String? = nil  // current Claude Code session
+    private var approvalAgentId: String = "integration_claude"  // pill awaiting the current approval
 
     private init() {}
 
@@ -174,16 +175,9 @@ final class HookServer: @unchecked Sendable {
         let agentId = validAgent.map { "agent_\($0)" } ?? "integration_claude"
         let isExternalAgent = validAgent != nil
 
-        let termProgram = payload["term_program"] as? String ?? ""
-        let bundleId    = payload["bundle_id"]    as? String ?? ""
-        let isVSCode = termProgram.lowercased().contains("vscode") ||
-                       bundleId.lowercased().contains("vscode")
-        // External agents bypass the VS Code filter (their relay runs in any terminal).
-        guard isExternalAgent || isVSCode else {
-            nbLog("Ignored \(name) from \(termProgram.isEmpty ? bundleId : termProgram) (\(projectName))")
-            return
-        }
-
+        // No terminal filter: the user installs these hooks deliberately, so Claude
+        // Code events from any terminal (Warp, iTerm, Terminal, Ghostty, VS Code, …)
+        // all count, just like external agents already did.
         let focused = state.focusId == agentId
 
         switch name {
@@ -349,57 +343,47 @@ final class HookServer: @unchecked Sendable {
         let rawName   = URL(fileURLWithPath: cwd).lastPathComponent
         let projectName = aliasProjectName(rawName.isEmpty ? "Session" : rawName)
 
-        // External agents (coucou_agent) do not yet get an approval card — answering
-        // would show a card that looks like a Claude Code request. Reply immediately
-        // with no decision so the relay writes nothing and the agent re-asks in its
-        // terminal. Approval support for other agents will come with Codex support.
+        // Route the approval to the right pill: Claude Code → integration_claude,
+        // an external agent (Codex, …) → its own agent_<name> pill. No terminal
+        // filter — the user installed these hooks deliberately, so approvals from any
+        // terminal count. The decision we write back (allow/deny/ask) is translated
+        // by the relay into whatever contract the agent expects; Codex's matches
+        // Claude Code's exactly.
         let rawAgent = payload["coucou_agent"] as? String ?? ""
-        if Self.validateAgent(rawAgent) != nil {
-            Task.detached { [weak self] in
-                self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
-                close(fd)
-            }
-            return
-        }
-
-        let termProgram = payload["term_program"] as? String ?? ""
-        let bundleId    = payload["bundle_id"]    as? String ?? ""
-        let isVSCode = termProgram.lowercased().contains("vscode") ||
-                       bundleId.lowercased().contains("vscode")
-        guard isVSCode else {
-            Task.detached { [weak self] in
-                self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
-                close(fd)
-            }
-            return
-        }
+        let validAgent = Self.validateAgent(rawAgent)
+        let agentId = validAgent.map { "agent_\($0)" } ?? "integration_claude"
 
         let tool = payload["tool_name"] as? String ?? "Tool"
         var command = tool
         if let input = payload["tool_input"] as? [String: Any] {
             command = input["command"] as? String ?? tool
         }
-        nbLog("PermissionRequest \(tool)")
+        nbLog("PermissionRequest \(tool) [\(agentId)]")
 
         if pendingApprovalFD >= 0 {
             let old = pendingApprovalFD
             Task.detached { [weak self] in
-                // "ask" → nb-hook outputs nothing → Claude Code re-asks
+                // "ask" → nb-hook outputs nothing → the agent re-asks
                 self?.sendLine(fd: old, text: #"{"permissionDecision":"ask"}"#)
                 close(old)
             }
         }
         pendingApprovalFD = fd
         activeSessionId = sessionId
+        approvalAgentId = agentId
 
-        upsertTask(projectName: projectName, cwd: cwd)
-        state.updateTask(id: "integration_claude", state: .approval)
+        if let agent = validAgent {
+            upsertExternalAgent(id: agentId, name: agent)
+        } else {
+            upsertTask(projectName: projectName, cwd: cwd)
+        }
+        state.updateTask(id: agentId, state: .approval)
         state.pendingApproval = ApprovalInfo(sessionId: sessionId, tool: tool, command: command)
         state.isPinned = true
         SoundEngine.shared.play("approval")
 
         // Approval always forces the island open — user must be able to respond
-        state.focusId = "integration_claude"
+        state.focusId = agentId
         expandIfNeeded(to: .approval)
 
         let captured = fd
@@ -434,8 +418,8 @@ final class HookServer: @unchecked Sendable {
         let state = AppState.shared
         state.pendingApproval = nil
         state.isPinned = false
-        state.updateTask(id: "integration_claude", state: .working)
-        clearPillBadge(id: "integration_claude")
+        state.updateTask(id: approvalAgentId, state: .working)
+        clearPillBadge(id: approvalAgentId)
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
 
