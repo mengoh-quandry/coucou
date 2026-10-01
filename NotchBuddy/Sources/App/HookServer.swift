@@ -305,6 +305,9 @@ final class HookServer: @unchecked Sendable {
         state.tasks.append(task)
         if state.focusId == nil { state.focusId = id }
         state.syncMode()
+        // A new session appeared — reveal the island (there is no always-present pill
+        // now, and a mid-run session may only ever send PreToolUse, never SessionStart).
+        if state.isPresent { expandIfNeeded(to: .overview) }
     }
 
     // MARK: - Helpers
