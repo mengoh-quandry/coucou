@@ -30,8 +30,13 @@ struct IslandContainer: View {
     @State private var islandTopRadius: CGFloat = 0
     @State private var greetNotif: Bool = false
 
+    // Droplet morph: a transient squash/stretch applied as the island expands,
+    // for a liquid, iPad-style "drop" feel (pairs with the Liquid Glass shape morph).
+    @State private var dropletPhase: CGFloat = 0
+
     private let openSpring = Animation.spring(response: 0.5, dampingFraction: 0.72)
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
+    private let dropletSpring = Animation.spring(response: 0.52, dampingFraction: 0.58)
 
     private var chatPromptHeight: CGFloat {
         let base: CGFloat = 240
@@ -129,14 +134,26 @@ struct IslandContainer: View {
             .animation(.easeInOut(duration: 0.25), value: state.mode == .compact)
         }
         .frame(width: islandWidth, height: islandHeight, alignment: .topLeading)
+        // Droplet morph: anchored at the notch, the island briefly stretches down
+        // and pinches in, then settles — a liquid "drop" forming on expand.
+        .scaleEffect(x: 1 - dropletPhase * 0.05, y: 1 + dropletPhase * 0.13, anchor: .top)
         .onChange(of: state.mode) { oldMode, newMode in
             let shrinking = modeOrder(newMode) < modeOrder(oldMode)
-            let anim = shrinking ? closeEase : openSpring
+            let expanding = newMode == .expanded && !shrinking
+            let anim = shrinking ? closeEase : (expanding ? dropletSpring : openSpring)
             let (w, h) = islandSize(mode: newMode, view: state.view,
                                     progress: state.uploadProgress,
                                     nw: state.notchWidth, nh: state.notchHeight)
             let cr  = newMode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             let tr: CGFloat = 0
+            if expanding {
+                // Pop to stretched instantly, then settle on the next tick so the
+                // scale animates 1.13→1.0 while the size springs open.
+                dropletPhase = 1
+                DispatchQueue.main.async {
+                    withAnimation(dropletSpring) { dropletPhase = 0 }
+                }
+            }
             withAnimation(anim) {
                 islandWidth      = w
                 islandHeight     = (newMode == .expanded && state.view == .prompt) ? chatPromptHeight : h
