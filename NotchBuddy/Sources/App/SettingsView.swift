@@ -4,28 +4,7 @@ import AppKit
 
 struct SettingsView: View {
     @ObservedObject private var state = AppState.shared
-    @State private var apiKey: String = KeychainStore.shared.get("anthropic-api-key") ?? ""
 
-    // Claude model — dynamic list fetched from the API, static fallback if unavailable
-    private static let fallbackModels: [(id: String, label: String)] = [
-        ("claude-sonnet-4-6",         "Claude Sonnet 4.6"),
-        ("claude-sonnet-5-5",         "Claude Sonnet 5.5"),
-        ("claude-opus-5-5",           "Claude Opus 5.5"),
-        ("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
-    ]
-    private static let customModelTag = "__custom__"
-    @State private var fetchedModels: [(id: String, label: String)] = []
-    @State private var modelChoice: String = {
-        let m = AppState.shared.claudeModel
-        return SettingsView.fallbackModels.contains { $0.id == m } ? m : SettingsView.customModelTag
-    }()
-    @State private var customModel: String = {
-        let m = AppState.shared.claudeModel
-        return SettingsView.fallbackModels.contains { $0.id == m } ? "" : m
-    }()
-    private var displayModels: [(id: String, label: String)] {
-        fetchedModels.isEmpty ? Self.fallbackModels : fetchedModels
-    }
     @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
     @State private var statusMessage: String = ""
     @State private var showDiff: Bool = false
@@ -42,30 +21,16 @@ struct SettingsView: View {
     @State private var showAgyDiff: Bool = false
     @State private var pendingAgyJSON: String = ""
     @State private var agyPendingInstall: Bool = true
-    #endif
 
-    // Integration keys
-    @State private var resendKey: String    = KeychainStore.shared.get("resend-api-key")  ?? ""
-    @State private var resendFrom: String   = KeychainStore.shared.get("resend-from")     ?? ""
-    @State private var n8nUrl: String       = KeychainStore.shared.get("n8n-url")         ?? ""
-    @State private var n8nKey: String       = KeychainStore.shared.get("n8n-api-key")     ?? ""
-    @State private var vercelToken: String  = KeychainStore.shared.get("vercel-token")    ?? ""
-    @State private var githubToken: String  = KeychainStore.shared.get("github-token")    ?? ""
-    @State private var stripeKey: String    = KeychainStore.shared.get("stripe-api-key")  ?? ""
-    @State private var calcomKey: String    = KeychainStore.shared.get("calcom-api-key")  ?? ""
-    @State private var notionKey: String    = KeychainStore.shared.get("notion-api-key")  ?? ""
+    @State private var codexHooksInstalled: Bool = HookServer.codexHooksInstalled()
+    @State private var showCodexDiff: Bool = false
+    @State private var pendingCodexJSON: String = ""
+    @State private var codexPendingInstall: Bool = true
+    #endif
 
     // Hotkey
     @State private var hotkeyFlags: UInt    = AppState.shared.hotkeyFlags
     @State private var hotkeyCode: UInt16   = AppState.shared.hotkeyCode
-
-    // Vercel project filter
-    @State private var vercelProjects: [String] = []
-    @State private var loadingVercel: Bool = false
-
-    // n8n workflow filter
-    @State private var n8nWorkflows: [String] = []
-    @State private var loadingN8n: Bool = false
 
     // Bindings in minutes for the absence field
     private var absenceMinutes: Binding<Double> {
@@ -78,46 +43,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-
-                // MARK: API
-                GroupBox("Anthropic API") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SecureField("API key (sk-ant-…)", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                        Button("Save") {
-                            KeychainStore.shared.set("anthropic-api-key", value: apiKey)
-                            statusMessage = "✓ Key saved."
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Divider().padding(.vertical, 2)
-
-                        Picker("Model", selection: $modelChoice) {
-                            ForEach(displayModels, id: \.id) { preset in
-                                Text(preset.label).tag(preset.id)
-                            }
-                            Text("Custom…").tag(Self.customModelTag)
-                        }
-                        .onChange(of: modelChoice) { _, choice in
-                            if choice != Self.customModelTag {
-                                state.claudeModel = choice
-                            } else {
-                                applyCustomModel(customModel)
-                            }
-                        }
-
-                        if modelChoice == Self.customModelTag {
-                            TextField("Model ID (e.g. claude-sonnet-4-6)", text: $customModel)
-                                .textFieldStyle(.roundedBorder)
-                                .onChange(of: customModel) { _, value in applyCustomModel(value) }
-                        }
-
-                        Text("Used by the chat. The list comes from your Anthropic account.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(6)
-                }
 
                 // MARK: Hooks
                 GroupBox("Claude Code Hooks") {
@@ -181,8 +106,44 @@ struct SettingsView: View {
                     .padding(6)
                 }
 
-                // MARK: Gemini CLI Hooks / Antigravity Hooks
+                // MARK: Codex CLI / Gemini CLI / Antigravity Hooks
                 #if !APPSTORE
+                GroupBox("Codex CLI Hooks") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(codexHooksInstalled
+                             ? "Hooks installed — run /hooks in Codex to trust them, then restart Codex"
+                             : "~/.codex/hooks.json")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 10) {
+                            Button("Install hooks") { triggerCodexPreview(install: true) }
+                                .buttonStyle(.borderedProminent)
+                            Button("Uninstall") { triggerCodexPreview(install: false) }
+                                .buttonStyle(.bordered)
+                        }
+                        if showCodexDiff {
+                            ScrollView {
+                                Text(pendingCodexJSON)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(height: 140)
+                            .background(Color(NSColor.textBackgroundColor))
+                            .cornerRadius(6)
+                            HStack {
+                                Button("Confirm & write") { confirmCodexOp() }
+                                    .buttonStyle(.borderedProminent)
+                                Button("Cancel") { showCodexDiff = false; pendingCodexJSON = "" }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                        Text("After installing, open Codex and run /hooks to review and trust the Coucou hooks.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(6)
+                }
+
                 GroupBox("Gemini CLI Hooks") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(geminiHooksInstalled
@@ -250,104 +211,6 @@ struct SettingsView: View {
                 }
                 #endif
 
-                // MARK: Integrations
-                GroupBox("Integrations") {
-                    VStack(alignment: .leading, spacing: 14) {
-
-                        // Resend
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#22C55E")).frame(width: 8, height: 8)
-                                Text("Resend").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("API key  (re_…)", text: $resendKey)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("From address  (you@yourdomain.com)", text: $resendFrom)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // n8n
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#F29B38")).frame(width: 8, height: 8)
-                                Text("n8n").font(.system(size: 12, weight: .semibold))
-                            }
-                            TextField("Instance URL  (https://…)", text: $n8nUrl)
-                                .textFieldStyle(.roundedBorder)
-                            SecureField("API key", text: $n8nKey)
-                                .textFieldStyle(.roundedBorder)
-                            IntegrationFilterRow(
-                                label: "Workflows",
-                                items: n8nWorkflows,
-                                filter: $state.n8nWorkflowFilter,
-                                loading: loadingN8n,
-                                onLoad: loadN8nWorkflows
-                            )
-                        }
-
-                        // Vercel
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#7C5CFF")).frame(width: 8, height: 8)
-                                Text("Vercel").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Token", text: $vercelToken)
-                                .textFieldStyle(.roundedBorder)
-                            IntegrationFilterRow(
-                                label: "Projects",
-                                items: vercelProjects,
-                                filter: $state.vercelProjectFilter,
-                                loading: loadingVercel,
-                                onLoad: loadVercelProjects
-                            )
-                        }
-
-                        // GitHub
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#F4505E")).frame(width: 8, height: 8)
-                                Text("GitHub").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Personal Access Token", text: $githubToken)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Stripe
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#0570DE")).frame(width: 8, height: 8)
-                                Text("Stripe").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Secret key  (sk_live_… or sk_test_…)", text: $stripeKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Cal.com
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#C9956A")).frame(width: 8, height: 8)
-                                Text("Cal.com").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("API key  (cal_live_…)", text: $calcomKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Notion
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#E8E8E8")).frame(width: 8, height: 8)
-                                Text("Notion").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Integration token  (secret_…)", text: $notionKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        Button("Save integrations") { saveIntegrations() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding(6)
-                }
-
                 // MARK: Son
                 GroupBox("Sound") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -381,49 +244,6 @@ struct SettingsView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 48)
                             Text("min without movement")
-                        }
-                    }
-                    .padding(6)
-                }
-
-                // MARK: Active pills
-                GroupBox("Active pills") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("VS Code")
-                                .font(.system(size: 12, weight: .semibold))
-                            Circle().fill(Color(hex: "#F5F6F8")).frame(width: 8, height: 8)
-                            Spacer()
-                            Text("Always active")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        Text("\(state.activeIntegrations.count)/4 slots used")
-                            .font(.system(size: 11))
-                            .foregroundColor(state.activeIntegrations.count >= 4 ? .orange : .secondary)
-
-                        ForEach(AgentTask.toggleableIntegrationIds, id: \.self) { id in
-                            let task = AgentTask.integrationAgents.first { $0.id == id }!
-                            let isOn = state.activeIntegrations.contains(id)
-                            let atMax = state.activeIntegrations.count >= 4 && !isOn
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(Color(hex: task.color))
-                                    .frame(width: 10, height: 10)
-                                Text(task.name)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(atMax ? .secondary : .primary)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { isOn },
-                                    set: { _ in state.toggleIntegration(id) }
-                                ))
-                                .labelsHidden()
-                                .disabled(atMax)
-                            }
                         }
                     }
                     .padding(6)
@@ -467,34 +287,10 @@ struct SettingsView: View {
             }
             .padding(20)
         }
-        .onAppear {
-            guard fetchedModels.isEmpty,
-                  let key = KeychainStore.shared.get("anthropic-api-key"), !key.isEmpty else { return }
-            Task {
-                let models = await ClaudeService.fetchModels(apiKey: key)
-                guard !models.isEmpty else { return }
-                await MainActor.run {
-                    fetchedModels = models
-                    let m = state.claudeModel
-                    if models.contains(where: { $0.id == m }) {
-                        modelChoice = m
-                        customModel = ""
-                    } else if modelChoice != Self.customModelTag {
-                        modelChoice = Self.customModelTag
-                        customModel = m
-                    }
-                }
-            }
-        }
         .frame(minWidth: 420, maxWidth: .infinity, minHeight: 320, maxHeight: .infinity)
     }
 
     // MARK: - Actions
-
-    private func applyCustomModel(_ value: String) {
-        let id = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !id.isEmpty { state.claudeModel = id }
-    }
 
     private func toggleStartup(_ on: Bool) {
         do {
@@ -592,6 +388,33 @@ struct SettingsView: View {
     }
 
     #if !APPSTORE
+    private func triggerCodexPreview(install: Bool) {
+        do {
+            codexPendingInstall = install
+            pendingCodexJSON = try HookServer.shared.previewCodexHooks(install: install)
+            showCodexDiff = true
+            statusMessage = "Review the JSON below before confirming."
+        } catch let e as NSError where e.domain == "CoucouNoop" {
+            statusMessage = e.localizedDescription
+        } catch {
+            statusMessage = "❌ \(error.localizedDescription)"
+        }
+    }
+
+    private func confirmCodexOp() {
+        do {
+            try HookServer.shared.writeCodexHooks()
+            showCodexDiff = false
+            pendingCodexJSON = ""
+            codexHooksInstalled = codexPendingInstall
+            statusMessage = codexPendingInstall
+                ? "✓ Codex hooks installed in ~/.codex/hooks.json — run /hooks in Codex to trust them."
+                : "✓ Codex hooks removed."
+        } catch {
+            statusMessage = "❌ \(error.localizedDescription)"
+        }
+    }
+
     private func triggerGeminiPreview(install: Bool) {
         do {
             geminiPendingInstall = install
@@ -646,157 +469,6 @@ struct SettingsView: View {
         }
     }
     #endif
-
-    private func saveIntegrations() {
-        saveKey("resend-api-key",  value: resendKey)
-        saveKey("resend-from",     value: resendFrom)
-        saveKey("n8n-url",         value: n8nUrl)
-        saveKey("n8n-api-key",     value: n8nKey)
-        saveKey("vercel-token",    value: vercelToken)
-        saveKey("github-token",    value: githubToken)
-        saveKey("stripe-api-key",  value: stripeKey)
-        saveKey("calcom-api-key",  value: calcomKey)
-        saveKey("notion-api-key",  value: notionKey)
-        statusMessage = "✓ Integration keys saved."
-    }
-
-    /// Saves non-empty value; removes only if key was previously set (explicit user clear).
-    private func saveKey(_ key: String, value: String) {
-        if value.isEmpty {
-            KeychainStore.shared.remove(key)
-        } else {
-            KeychainStore.shared.set(key, value: value)
-        }
-    }
-
-    // MARK: - Vercel project list
-
-    private func loadVercelProjects() {
-        guard let token = KeychainStore.shared.get("vercel-token") else {
-            statusMessage = "❌ Save Vercel token first."
-            return
-        }
-        loadingVercel = true
-        guard let url = URL(string: "https://api.vercel.com/v9/projects?limit=100") else { return }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let names: [String]
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let projects = json["projects"] as? [[String: Any]] {
-                names = projects.compactMap { $0["name"] as? String }.sorted()
-            } else {
-                names = []
-            }
-            DispatchQueue.main.async {
-                self.vercelProjects = names
-                self.loadingVercel = false
-                if names.isEmpty { self.statusMessage = "❌ No Vercel projects found." }
-            }
-        }.resume()
-    }
-
-    // MARK: - n8n workflow list
-
-    private func loadN8nWorkflows() {
-        guard let apiKey  = KeychainStore.shared.get("n8n-api-key"),
-              let rawBase = KeychainStore.shared.get("n8n-url") else {
-            statusMessage = "❌ Save n8n URL and API key first."
-            return
-        }
-        loadingN8n = true
-        let base = rawBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let urls = ["\(base)/api/v1/workflows?limit=100", "\(base)/rest/workflows?limit=100"]
-        fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: 0)
-    }
-
-    private func fetchN8nWorkflows(urls: [String], apiKey: String, idx: Int) {
-        guard idx < urls.count, let url = URL(string: urls[idx]) else {
-            DispatchQueue.main.async { self.loadingN8n = false; self.statusMessage = "❌ No n8n workflows found." }
-            return
-        }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue(apiKey, forHTTPHeaderField: "X-N8N-API-KEY")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else {
-                self.fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: idx + 1)
-                return
-            }
-            let items: [[String: Any]]
-            if let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-               let arr = obj["data"] as? [[String: Any]] { items = arr }
-            else if let arr = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] { items = arr }
-            else { items = [] }
-            let names = items.compactMap { $0["name"] as? String }.sorted()
-            DispatchQueue.main.async {
-                self.n8nWorkflows = names
-                self.loadingN8n = false
-                if names.isEmpty { self.statusMessage = "❌ No n8n workflows found." }
-            }
-        }.resume()
-    }
-}
-
-// MARK: - Integration filter row (reusable for Vercel / n8n)
-
-struct IntegrationFilterRow: View {
-    let label: String
-    let items: [String]
-    @Binding var filter: Set<String>
-    let loading: Bool
-    let onLoad: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                Spacer()
-                if loading {
-                    ProgressView().scaleEffect(0.6)
-                } else {
-                    Button(items.isEmpty ? "Load list" : "Refresh") { onLoad() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                }
-                if !filter.isEmpty {
-                    Button("Clear") { filter = [] }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .foregroundColor(.secondary)
-                }
-            }
-            if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(items, id: \.self) { item in
-                        Toggle(item, isOn: Binding(
-                            get: { filter.isEmpty || filter.contains(item) },
-                            set: { on in
-                                if on { filter.insert(item) }
-                                else  {
-                                    // First click on any item: switch from "all" to explicit set
-                                    if filter.isEmpty { filter = Set(items).subtracting([item]) }
-                                    else { filter.remove(item) }
-                                    if filter.count == items.count { filter = [] } // all = empty
-                                }
-                            }
-                        ))
-                        .font(.system(size: 11))
-                        .toggleStyle(.checkbox)
-                    }
-                }
-                .padding(.leading, 4)
-                if !filter.isEmpty {
-                    Text("Watching \(filter.count) of \(items.count)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Shortcut recorder button

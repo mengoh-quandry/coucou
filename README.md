@@ -2,160 +2,86 @@
 
 <img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="Coucou icon">
 
-# Coucou
+# Coucou — local agents fork
 
-**A tiny friend that lives in your Mac's notch — or at the top of your screen on Windows — and keeps an eye on your Claude Code sessions.**
+**A tiny friend that lives in your Mac's notch and keeps an eye on your coding-agent sessions — Claude Code, Codex, Gemini CLI and Antigravity.**
 
-Approve permissions, watch your agents work, drop a file, chat with Claude — all without leaving what you're doing.
+Approve permissions and watch your agents work, all without leaving what you're doing. **No API keys, no cloud integrations, no telemetry — it only ever talks to agents running on your own machine.**
 
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)
-![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
 ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)
-![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![GitHub stars](https://img.shields.io/github/stars/Louis-CFM/coucou?style=social)
-
-<img src="docs/media/demo.gif" width="760" alt="Coucou in action">
 
 </div>
 
 ---
 
-## Why
+## About this fork
 
-Some studios showed off gorgeous notch companions… and never let anyone use them.
-**Coucou is the open version.** Every line of code, every animation, every sound — free to use, read, fork and remix.
+This is a fork of [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), trimmed down to a **pure local coding-agent monitor**:
 
-Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch, waves hello, follows your cursor with its eyes, gets annoyed when you poke it (and dizzy if you insist), and tells you the moment Claude Code needs you.
+- **Removed** everything that needed an API key or talked to a third-party cloud: the Stripe / Vercel / GitHub / Resend / Notion / Cal.com / n8n integration pills and their pollers, the built-in Anthropic chat, and all Keychain key storage. The app now makes **no outbound network connections**.
+- **Added Codex CLI** as a first-class monitored agent, alongside Claude Code, Gemini CLI and Antigravity.
+- **macOS only.** The upstream Windows (Tauri) app has been dropped from this fork.
 
-## Features
+See [`docs/FORK-NOTES.md`](docs/FORK-NOTES.md) for the full design and the Codex wiring.
 
-- 🤖 **Claude Code, Gemini CLI, Antigravity and other agents, live** — see every session in your notch: what it reads, edits and runs, step by step. Tag a hook payload with `coucou_agent` to give any agent its own pill (see [`docs/AGENTS.md`](docs/AGENTS.md)). Finished? Mochi does a happy little jump.
-- ✅ **Approve from the notch** — Claude Code permission requests show up with **Allow / Deny**. One click, back to work.
-- 🧑‍💻 **Jump to the right terminal** — open the exact terminal window of a session *(macOS)*.
-- 💬 **Ask Claude anything** — built-in chat, straight from the notch. Pick the model in Settings; the list comes from your Anthropic account.
-- 📎 **Drop a file on the notch** — Mochi turns into a box and swallows it, then ask a question about it or send it by email *(email: macOS, Mail.app)*.
-- 🪟 **Drag Mochi onto any window** — attach that window as context for Claude *(macOS)*.
-- 🔌 **Integrations** — Stripe payments, n8n workflows, GitHub, Vercel deployments, Resend emails, Notion, Cal.com. Each one gets its own little colored Mochi.
+## What it does
+
+Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch, waves hello, follows your cursor, and tells you the moment one of your coding agents needs you.
+
+- 🤖 **Claude Code, Codex, Gemini CLI and Antigravity, live** — see every session in your notch: what it reads, edits and runs, step by step. Finished? Mochi does a happy little jump.
+- ✅ **Approve from the notch** — permission requests show up with **Allow / Deny**. One click, back to work. Works for Claude Code and Codex.
+- 🧑‍💻 **Jump to the right terminal** — open the terminal window of a session.
+- 📎 **Drop a file on the notch** — Mochi turns into a box and swallows it, then send it by email via Mail.app.
+- 🪟 **Drag Mochi onto any window** — attach that window as context.
 - 🎭 **A real character** — idle breathing, blinks, eyes on a sphere that follow your mouse, emotes, 28 handcrafted sounds, a greeting on launch.
-- 🫥 **Invisible when idle** — hides away when nothing is running, peeks out when you hover the notch (the top edge of the screen on Windows).
-- 🖥️ **Any Mac, notch or not** — on an iMac, a Mac mini, or a MacBook with its lid closed on an external display, Mochi sits in a small bar at the top of the screen.
-- 🔒 **Private by design** — no telemetry, no account. Keys live in your macOS Keychain or Windows Credential Manager. The app only talks to the services you plug in.
+- 🫥 **Invisible when idle** — hides away when nothing is running, peeks out when you hover the notch.
+- 🖥️ **Any Mac, notch or not** — on an iMac, Mac mini, or a closed-lid MacBook on an external display, Mochi sits in a small bar at the top of the screen.
+- 🔒 **Private by design, for real** — no telemetry, no account, no API keys, no outbound connections. Everything stays between the app and the agents on your Mac.
 
-<table>
-<tr>
-<td><img src="docs/media/claude-code.png" alt="Claude Code session"></td>
-<td><img src="docs/media/stripe.png" alt="Stripe payments"></td>
-</tr>
-<tr>
-<td><img src="docs/media/chat.png" alt="Chat with Claude"></td>
-<td><img src="docs/media/dizzy.png" alt="Too many hits"></td>
-</tr>
-</table>
+## Build from source
 
-## Install
-
-### Download for macOS
-
-1. Grab the latest `Coucou.zip` from [Releases](https://github.com/Louis-CFM/coucou/releases).
-2. Unzip and move **Coucou.app** to `/Applications`.
-3. Launch. This build isn't notarized by Apple yet, so the first time macOS says it can't verify the developer: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** (only once).
-
-### Windows
-
-The Windows installer is **temporarily unavailable**. Microsoft Defender wrongly
-flags the unsigned installer as malware; a false-positive report is under review
-at Microsoft and the installer will come back once it is cleared and signed.
-Until then you can [build it from source](#build-from-source).
-
-There is no notch on a PC, so the island slides out of the top edge of the screen
-instead of hiding inside one. See [`windows/README.md`](windows/README.md) for the
-rest of the differences.
-
-### Build from source
-
-**macOS** — requirements: macOS 15+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Requirements: macOS 15+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
 brew install xcodegen
-git clone https://github.com/Louis-CFM/coucou.git
+git clone https://github.com/mengoh-quandry/coucou.git
 cd coucou/NotchBuddy
 xcodegen
 open NotchBuddy.xcodeproj   # then ⌘R
 ```
 
-**Windows** — requirements: [Rust](https://rustup.rs), Node 20+, MSVC build tools.
-
-```powershell
-git clone https://github.com/Louis-CFM/coucou.git
-cd coucou/windows
-npm install
-npm run pack                # installer lands in windows/release/
-```
-
 ## Setup
 
-Click the Coucou icon in the menu bar (macOS) or in the system tray (Windows) → **Settings…**
+Click the Coucou icon in the menu bar → **Settings…**, then install hooks for the agents you use. Each installer backs up the target file and shows you the exact diff before writing anything.
 
-| What | Why | Where the key goes |
+| Agent | What to do | What it writes |
 |---|---|---|
-| **Claude Code hooks** | live sessions and approvals | **Install hooks** — Coucou backs up `~/.claude/settings.json`, merges its hooks and shows you the diff before writing anything |
-| **Gemini CLI hooks** *(macOS)* | Gemini CLI sessions in the island | **Install hooks** in Settings → Gemini CLI — backs up `~/.gemini/settings.json` |
-| **Antigravity (agy) hooks** *(macOS)* | agy sessions in the island | **Install hooks** in Settings → Antigravity — backs up `~/.gemini/config/hooks.json` |
-| **Anthropic API key** | chat and questions about files | Keychain / Windows Credential Manager |
-| Stripe, n8n, GitHub, Vercel, Resend, Notion, Cal.com | the integration pills | Keychain / Windows Credential Manager, all optional |
+| **Claude Code** | Settings → **Claude Code Hooks → Install** | merges into `~/.claude/settings.json` |
+| **Codex CLI** | Settings → **Codex CLI Hooks → Install**, then run `/hooks` inside Codex to **trust** them | merges into `~/.codex/hooks.json` |
+| **Gemini CLI** | Settings → **Gemini CLI Hooks → Install** | merges into `~/.gemini/settings.json` |
+| **Antigravity** | Settings → **Antigravity Hooks → Install** | merges into `~/.gemini/config/hooks.json` |
 
-If Coucou isn't running, the hook exits immediately: **Claude Code is never blocked.**
+> **Codex trust step:** Codex only runs a hook once its hash is trusted. After installing, open Codex and run `/hooks` to review and trust the Coucou hooks, then restart Codex. (For a one-off test you can run `codex exec --dangerously-bypass-hook-trust "..."`.)
 
-## Things to try
-
-| Do this | Mochi does that |
-|---|---|
-| Hover the notch (top edge on Windows) | peeks out and says hi 👋 |
-| Click it | opens |
-| Hover Mochi | blinks, eyes grow |
-| Click Mochi | squish + annoyed |
-| Click 3 times fast | 😵‍💫 dizzy for a few seconds |
-| Drag a file onto the island | turns into a box and swallows it |
-| Drag Mochi onto a window *(macOS)* | attaches it as context |
+If Coucou isn't running, every hook exits immediately: **your agent is never blocked.**
 
 ## How it works
 
-**macOS**
-
-- **Island**: a borderless `NSPanel` hugging the notch, driven by a small state machine (`hidden → petit → home`).
+- **Island**: a borderless `NSPanel` hugging the notch, driven by a small state machine.
 - **Character**: drawn in SwiftUI `Canvas` + `TimelineView` at 60 fps — squircle body, eyes projected on a sphere, spring animations. No Rive, no Lottie, no images.
-- **Claude Code**: a tiny `nb-hook` script receives hook events and forwards them over a Unix socket to the app. For approvals it waits for your click, then answers the hook.
-- **Integrations**: lightweight pollers, paused when nothing is watching.
+- **Agents**: a tiny `nb-hook` relay receives hook events from each agent and forwards them over a per-user Unix socket to the app, dropping the large/sensitive fields (`tool_response`, transcript paths) and capping field sizes. For approvals it waits for your click, then answers the hook. Claude Code, Codex, Gemini and Antigravity all share this one relay — Codex works because its hook format, event names and PermissionRequest contract match Claude Code's.
 - **Sounds**: 28 short WAVs played through preloaded `AVAudioPlayer`s.
 
-The macOS app is native Swift 6 / SwiftUI / AppKit with **zero third-party dependencies**.
-
-**Windows**
-
-- A [Tauri 2](https://tauri.app) app (Rust + TypeScript): the island is a transparent, always-on-top window that never steals focus, Mochi is drawn in Canvas 2D with the same shapes, timings and sounds as on the Mac.
-- Claude Code hooks go through a tiny `coucou-hook.exe` and a named pipe; keys live in Windows Credential Manager.
-- Details and differences in [`windows/README.md`](windows/README.md).
-
-## Contributing
-
-Issues and PRs are very welcome — new integrations, new emotes, new sounds, bug fixes. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Native Swift 6 / SwiftUI / AppKit with **zero third-party dependencies**.
 
 ## Credits
 
-Built by [Louis Raillé](https://louisraille.fr) with Claude Code.
-Inspired by the notch-companion concepts shared by design studios — this project is independent and not affiliated with any of them.
+Original app built by [Louis Raillé](https://louisraille.fr). This local-agents fork keeps the upstream MIT code; the Mochi character, name, icon, sounds and media remain © Louis Raillé (see [LICENSE-ASSETS.md](LICENSE-ASSETS.md)) — if you redistribute a fork publicly, give it your own name and character.
 
 ## License
 
-- **Code:** [MIT](LICENSE) — use it, fork it, learn from it, just keep the copyright notice.
-- **Name, Mochi character, icon, sounds and media:** © Louis Raillé, all rights reserved — see [LICENSE-ASSETS.md](LICENSE-ASSETS.md). Shipping your own fork? Give it your own name and character.
-
-<div align="center">
-
-**If Mochi made you smile, a ⭐ helps a lot.**
-
-[Website](https://louis-cfm.github.io/coucou/) · [Privacy](https://louis-cfm.github.io/coucou/privacy.html) · [Terms](https://louis-cfm.github.io/coucou/terms.html) · [Support](https://louis-cfm.github.io/coucou/support.html)
-
-</div>
+- **Code:** [MIT](LICENSE).
+- **Name, Mochi character, icon, sounds and media:** © Louis Raillé, all rights reserved — see [LICENSE-ASSETS.md](LICENSE-ASSETS.md).

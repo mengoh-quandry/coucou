@@ -775,6 +775,9 @@ final class HookServer: @unchecked Sendable {
     private static var agyHooksURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/config/hooks.json")
     }
+    private static var codexHooksURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/hooks.json")
+    }
 
     // MARK: Installed-state detection
 
@@ -806,6 +809,24 @@ final class HookServer: @unchecked Sendable {
         let json = (try? JSONSerialization.data(withJSONObject: coucou))
             .flatMap { String(data: $0, encoding: .utf8) } ?? ""
         return json.contains("nb-hook")
+    }
+
+    static func codexHooksInstalled() -> Bool {
+        guard let data = try? Data(contentsOf: codexHooksURL),
+              let settings = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let hooks = settings["hooks"] as? [String: Any] else { return false }
+        for value in hooks.values {
+            guard let groups = value as? [[String: Any]] else { continue }
+            for group in groups {
+                if let innerHooks = group["hooks"] as? [[String: Any]] {
+                    for hook in innerHooks {
+                        if let cmd = hook["command"] as? String,
+                           cmd.contains("nb-hook"), cmd.contains("--agent codex") { return true }
+                    }
+                }
+            }
+        }
+        return false
     }
 
     // MARK: Gemini CLI – preview / write
@@ -967,6 +988,108 @@ final class HookServer: @unchecked Sendable {
                                                  label: "~/.gemini/config/hooks.json")
         root.removeValue(forKey: "coucou")
         return try JSONSerialization.data(withJSONObject: root,
+                                         options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+    }
+
+    // MARK: Codex CLI – preview / write
+    //
+    // Codex's hook config (~/.codex/hooks.json) uses the same shape and PascalCase
+    // event names as Claude Code, and the same PermissionRequest stdout contract,
+    // so the existing nb-hook relay drives it verbatim with `--agent codex`.
+    // Codex requires the hook's hash to be trusted (run `/hooks` in Codex) before
+    // it executes — the UI tells the user to do that after installing.
+
+    private var _pendingCodexData: Data?
+    private var _pendingCodexFingerprint: String?
+
+    func previewCodexHooks(install: Bool) throws -> String {
+        let url = Self.codexHooksURL
+        let exists = FileManager.default.fileExists(atPath: url.path)
+        if !install && !exists {
+            throw NSError(domain: "CoucouNoop", code: 0, userInfo: [
+                NSLocalizedDescriptionKey: "No Codex hooks to remove."
+            ])
+        }
+        let current = exists ? try Data(contentsOf: url) : Data()
+        _pendingCodexFingerprint = sha256Hex(current)
+        let newData = install ? try buildCodexHooksData() : try withoutCodexHooks()
+        _pendingCodexData = newData
+        return String(data: newData, encoding: .utf8) ?? ""
+    }
+
+    func writeCodexHooks() throws {
+        guard let data = _pendingCodexData, let fp = _pendingCodexFingerprint else { return }
+        let url = Self.codexHooksURL
+        let current = (try? Data(contentsOf: url)) ?? Data()
+        guard sha256Hex(current) == fp else {
+            throw NSError(domain: "Coucou", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "~/.codex/hooks.json changed since preview. Refresh and try again."
+            ])
+        }
+        try writeJSONFile(data, to: url, suffix: "hooks.json")
+        _pendingCodexData = nil
+        _pendingCodexFingerprint = nil
+    }
+
+    private func buildCodexHooksData() throws -> Data {
+        var settings = try Self.strictReadJSONObject(at: Self.codexHooksURL,
+                                                     label: "~/.codex/hooks.json")
+        if let raw = settings["hooks"], !(raw is [String: Any]) {
+            throw NSError(domain: "Coucou", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "~/.codex/hooks.json: \"hooks\" has an unexpected type — Coucou has not touched it."
+            ])
+        }
+        let base = hookBase()
+        // (Codex event name, timeout in seconds). PermissionRequest blocks while the
+        // user approves from the notch, so it gets a long timeout like Claude Code's.
+        let events: [(String, Int)] = [
+            ("SessionStart", 10), ("SessionEnd", 10),
+            ("UserPromptSubmit", 10),
+            ("PreToolUse", 10), ("PostToolUse", 10),
+            ("PermissionRequest", 120),
+            ("Stop", 10),
+            ("SubagentStart", 10), ("SubagentStop", 10),
+        ]
+        var hooks = settings["hooks"] as? [String: Any] ?? [:]
+        for (event, timeout) in events {
+            if let raw = hooks[event], !(raw is [[String: Any]]) {
+                throw NSError(domain: "Coucou", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "~/.codex/hooks.json: \"hooks\"[\"\(event)\"] has an unexpected type — Coucou has not touched it."
+                ])
+            }
+            var groups = hooks[event] as? [[String: Any]] ?? []
+            groups = removeNbHookEntries(from: groups)
+            let hookEntry: [String: Any] = [
+                "type": "command",
+                "command": "\(base) --agent codex \(event)",
+                "timeout": timeout,
+            ]
+            groups.append(["hooks": [hookEntry]])
+            hooks[event] = groups
+        }
+        settings["hooks"] = hooks
+        return try JSONSerialization.data(withJSONObject: settings,
+                                         options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+    }
+
+    private func withoutCodexHooks() throws -> Data {
+        var settings = try Self.strictReadJSONObject(at: Self.codexHooksURL,
+                                                     label: "~/.codex/hooks.json")
+        if let raw = settings["hooks"], !(raw is [String: Any]) {
+            throw NSError(domain: "Coucou", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "~/.codex/hooks.json: \"hooks\" has an unexpected type — Coucou has not touched it."
+            ])
+        }
+        if var hooks = settings["hooks"] as? [String: Any] {
+            for key in hooks.keys {
+                if let groups = hooks[key] as? [[String: Any]] {
+                    let cleaned = removeNbHookEntries(from: groups)
+                    if cleaned.isEmpty { hooks.removeValue(forKey: key) } else { hooks[key] = cleaned }
+                }
+            }
+            if hooks.isEmpty { settings.removeValue(forKey: "hooks") } else { settings["hooks"] = hooks }
+        }
+        return try JSONSerialization.data(withJSONObject: settings,
                                          options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
     }
 

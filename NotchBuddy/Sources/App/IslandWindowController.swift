@@ -749,7 +749,7 @@ final class IslandWindowController: NSWindowController {
         if s.mode == .expanded && s.view == .prompt {
             let base: CGFloat = 240
             let perMsg: CGFloat = 40
-            islandH = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            islandH = min(300, base + CGFloat(0) * perMsg)
         } else {
             islandH = fixedH
         }
@@ -814,7 +814,7 @@ final class IslandPanel: NSPanel {
         if s.mode == .expanded && s.view == .prompt {
             let base: CGFloat = 240
             let perMsg: CGFloat = 40
-            h = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            h = min(300, base + CGFloat(0) * perMsg)
         } else {
             h = fixedH
         }

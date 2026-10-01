@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## Fork: local agents edition (mengoh-quandry)
+
+- **Codex CLI support** — install hooks from Settings → Codex CLI Hooks; Codex sessions show up in the notch with approve/deny, alongside Claude Code, Gemini CLI and Antigravity. Codex reuses the existing `nb-hook` relay via `~/.codex/hooks.json`. Run `/hooks` in Codex to trust the hooks after installing.
+- **Removed all cloud integrations and the built-in chat** — the Stripe / Vercel / GitHub / Resend / Notion / Cal.com / n8n pills and pollers, the Anthropic chat, and all Keychain API-key storage are gone. The app makes no outbound network connections; it only watches local coding agents. File-drop email now uses Mail.app only.
+- **macOS only** — the upstream Windows (Tauri) app has been removed from this fork.
+- See `docs/FORK-NOTES.md`.
+
+## Unreleased (upstream)
 
 - Compact island on screens without a notch (#22) — thanks @Kamasoutra
 - Only web links (http/https) open from the notch; other kinds of links from Claude or integrations are ignored (#16) — thanks @Cris1670
