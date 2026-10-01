@@ -317,8 +317,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.NotchBuddy;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mengohlabs.NotchLee;
+				PRODUCT_NAME = NotchLee;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -335,8 +335,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.NotchBuddy;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mengohlabs.NotchLee;
+				PRODUCT_NAME = NotchLee;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -357,8 +357,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.Coucou;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mengohlabs.NotchLee.appstore;
+				PRODUCT_NAME = NotchLee;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APPSTORE;
 			};
@@ -380,8 +380,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.Coucou;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mengohlabs.NotchLee.appstore;
+				PRODUCT_NAME = NotchLee;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APPSTORE;
 			};
