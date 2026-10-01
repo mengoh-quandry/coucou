@@ -40,6 +40,7 @@ final class HookServer: @unchecked Sendable {
     private var pendingApprovalFD: Int32 = -1   // held open while user decides
     private var activeSessionId: String? = nil  // current Claude Code session
     private var approvalAgentId: String = "integration_claude"  // pill awaiting the current approval
+    private var summarizeInFlight: Set<String> = []  // agentIds with an on-device status summary in progress
 
     private init() {}
 
@@ -207,6 +208,8 @@ final class HookServer: @unchecked Sendable {
             let step = frenchStep(tool: tool, input: input)
             appendStep(id: agentId, step: step)
             nbLog("PreToolUse \(tool)")
+            // Ambient: replace the raw step with an on-device natural-language status.
+            summarizeStep(agentId: agentId, raw: step, tool: tool, input: input)
 
         case "PostToolUse":
             state.updateTask(id: agentId, state: .working)
@@ -466,6 +469,38 @@ final class HookServer: @unchecked Sendable {
         state.tasks[idx].steps.append(step)
         if state.tasks[idx].steps.count > 20 { state.tasks[idx].steps.removeFirst() }
         state.tasks[idx].stepIndex = state.tasks[idx].steps.count - 1
+    }
+
+    /// Ambient status: summarize a tool action with the on-device model and swap it in
+    /// for the raw step. Throttled to one in-flight summary per agent; silently keeps
+    /// the raw step if the model is unavailable or a newer step already arrived.
+    @MainActor
+    private func summarizeStep(agentId: String, raw: String, tool: String, input: [String: Any]) {
+        guard StatusSummarizer.isAvailable, !summarizeInFlight.contains(agentId) else { return }
+        let detail = (input["command"] as? String)
+            ?? (input["file_path"] as? String)
+            ?? (input["path"] as? String)
+            ?? (input["pattern"] as? String)
+            ?? (input["url"] as? String)
+            ?? (input["query"] as? String)
+            ?? raw
+        summarizeInFlight.insert(agentId)
+        let shortDetail = String(detail.prefix(200))
+        Task { @MainActor in
+            let summary = await StatusSummarizer.summarize(tool: tool, detail: shortDetail)
+            summarizeInFlight.remove(agentId)
+            if let summary { replaceLastStep(id: agentId, ifEquals: raw, with: summary) }
+        }
+    }
+
+    /// Replaces an agent's most recent step, but only if it is still the raw text we
+    /// summarized (a newer step may have arrived while the model was thinking).
+    @MainActor
+    private func replaceLastStep(id: String, ifEquals raw: String, with text: String) {
+        let state = AppState.shared
+        guard let idx = state.tasks.firstIndex(where: { $0.id == id }),
+              state.tasks[idx].steps.last == raw else { return }
+        state.tasks[idx].steps[state.tasks[idx].steps.count - 1] = text
     }
 
     // MARK: - Project name alias mapping
