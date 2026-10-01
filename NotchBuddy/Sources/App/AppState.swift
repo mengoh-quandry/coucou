@@ -7,13 +7,11 @@ import Combine
 // Claude Code / VS Code one. Other coding agents (Codex, Gemini, …) appear
 // dynamically as external-agent pills when their hook relay reports in.
 extension AgentTask {
-    /// Built-in pills. Only Claude Code is always active; there are no cloud integrations.
-    static let integrationAgents: [AgentTask] = [
-        AgentTask(id: "integration_claude",  name: "Claude Code", color: "#F5F6F8", state: .idle, steps: [], source: .claudeCode, isIntegration: true),
-    ]
+    /// No built-in/always-present pills: every pill is a live agent session, created
+    /// when a session reports in and removed when it ends. See HookServer.upsertSession.
+    static let integrationAgents: [AgentTask] = []
 
-    /// IDs that can be toggled. None — the Claude Code pill is always on and
-    /// external agents manage their own lifecycle.
+    /// IDs that can be toggled. None — pills are session-driven.
     static let toggleableIntegrationIds: [String] = []
 }
 
@@ -208,12 +206,8 @@ final class AppState: ObservableObject {
         else if view == .overview && tasks.isEmpty { view = .empty }
     }
 
-    /// Load the built-in Claude Code pill. Safe to call multiple times.
+    /// No-op now that pills are session-driven (kept for call-site compatibility).
     func loadIntegrationTasks() {
-        for task in AgentTask.integrationAgents {
-            if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
-        }
-        if focusId == nil { focusId = "integration_claude" }
         syncMode()
     }
 }

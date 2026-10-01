@@ -168,31 +168,30 @@ final class HookServer: @unchecked Sendable {
         let rawName = URL(fileURLWithPath: cwd).lastPathComponent
         let projectName = aliasProjectName(rawName.isEmpty ? "Session" : rawName)
 
-        // Determine which pill this event belongs to.
-        // coucou_agent must be lowercase, digits and hyphens, ≤ 24 chars.
-        // Absent or invalid → Claude Code pill (integration_claude); no change in behaviour.
+        // One pill PER SESSION so every concurrent agent shows at once. The pill id
+        // is keyed by session id (plus the agent name for non-Claude agents); the
+        // display name is the project. No terminal filter — the user installs these
+        // hooks deliberately, so sessions in any terminal all count.
         let rawAgent = payload["coucou_agent"] as? String ?? ""
         let validAgent = Self.validateAgent(rawAgent)
-        let agentId = validAgent.map { "agent_\($0)" } ?? "integration_claude"
-        let isExternalAgent = validAgent != nil
+        let source: AgentSource = validAgent != nil ? .agent : .claudeCode
+        let agentId = validAgent.map { "agent:\($0):\(sessionId)" } ?? "cc:\(sessionId)"
+        let displayName = validAgent.map { "\(projectName) · \($0)" } ?? projectName
 
-        // No terminal filter: the user installs these hooks deliberately, so Claude
-        // Code events from any terminal (Warp, iTerm, Terminal, Ghostty, VS Code, …)
-        // all count, just like external agents already did.
         let focused = state.focusId == agentId
 
         switch name {
 
         case "SessionStart":
             activeSessionId = sessionId
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertTask(projectName: projectName, cwd: cwd) }
-            nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
+            upsertSession(id: agentId, name: displayName, source: source, cwd: cwd)
+            nbLog("SessionStart \(displayName) (\(sessionId.prefix(8)))")
             if state.isPresent { expandIfNeeded(to: .overview) }
             SoundEngine.shared.play("work")
 
         case "UserPromptSubmit":
             activeSessionId = sessionId
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertTask(projectName: projectName, cwd: cwd) }
+            upsertSession(id: agentId, name: displayName, source: source, cwd: cwd)
             state.updateTask(id: agentId, state: .thinking)
             if let prompt = payload["prompt"] as? String, !prompt.isEmpty {
                 appendStep(id: agentId, step: String(prompt.prefix(60)))
@@ -201,7 +200,7 @@ final class HookServer: @unchecked Sendable {
 
         case "PreToolUse":
             activeSessionId = sessionId
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertTask(projectName: projectName, cwd: cwd) }
+            upsertSession(id: agentId, name: displayName, source: source, cwd: cwd)
             state.updateTask(id: agentId, state: .working)
             let tool = payload["tool_name"] as? String ?? "Tool"
             let input = payload["tool_input"] as? [String: Any] ?? [:]
@@ -240,13 +239,11 @@ final class HookServer: @unchecked Sendable {
             } else {
                 setPillBadge(id: agentId, badge: .finished)
             }
+            // Keep the session pill (idle) so every running session stays visible;
+            // it's removed on SessionEnd when the session actually closes.
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) {
-                if isExternalAgent {
-                    AppState.shared.removeTask(id: agentId)
-                } else {
-                    state.updateTask(id: agentId, state: .idle)
-                    self.clearPillBadge(id: agentId)
-                }
+                state.updateTask(id: agentId, state: .idle)
+                self.clearPillBadge(id: agentId)
             }
 
         case "StopFailure":
@@ -259,13 +256,8 @@ final class HookServer: @unchecked Sendable {
             }
 
         case "SessionEnd":
-            activeSessionId = nil
-            if isExternalAgent {
-                state.removeTask(id: agentId)
-            } else {
-                state.updateTask(id: agentId, state: .idle)
-                clearSession()
-            }
+            if activeSessionId == sessionId { activeSessionId = nil }
+            state.removeTask(id: agentId)
 
         case "SubagentStart":
             appendStep(id: agentId, step: "+ subagent")
@@ -295,20 +287,22 @@ final class HookServer: @unchecked Sendable {
         return raw
     }
 
-    /// Creates a dynamic pill for a third-party agent on first event, then no-ops.
-    /// ID format: "agent_<name>" — never collides with "integration_*" pills.
-    /// Inserted right after integration_claude so it appears in the visible prefix(4).
+    /// Creates or updates the pill for one session. Every agent session (Claude
+    /// Code or external) gets its own pill keyed by session id, so concurrent
+    /// sessions all show at once. On first event the pill is created; later events
+    /// just refresh its name and cwd.
     @MainActor
-    private func upsertExternalAgent(id: String, name: String) {
+    private func upsertSession(id: String, name: String, source: AgentSource, cwd: String) {
         let state = AppState.shared
-        guard state.tasks.firstIndex(where: { $0.id == id }) == nil else { return }
-        let color = IslandConst.colorForProject(name)
-        let task = AgentTask(id: id, name: name, color: color, state: .idle, steps: [], source: .agent)
-        if let claudeIdx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) {
-            state.tasks.insert(task, at: claudeIdx + 1)
-        } else {
-            state.tasks.append(task)
+        if let idx = state.tasks.firstIndex(where: { $0.id == id }) {
+            state.tasks[idx].name = name
+            if !cwd.isEmpty { state.tasks[idx].sessionCwd = cwd }
+            return
         }
+        let color = IslandConst.colorForProject(name)
+        let task = AgentTask(id: id, name: name, color: color, state: .idle,
+                             steps: [], source: source, sessionCwd: cwd.isEmpty ? nil : cwd)
+        state.tasks.append(task)
         if state.focusId == nil { state.focusId = id }
         state.syncMode()
     }
@@ -354,7 +348,9 @@ final class HookServer: @unchecked Sendable {
         // Claude Code's exactly.
         let rawAgent = payload["coucou_agent"] as? String ?? ""
         let validAgent = Self.validateAgent(rawAgent)
-        let agentId = validAgent.map { "agent_\($0)" } ?? "integration_claude"
+        let source: AgentSource = validAgent != nil ? .agent : .claudeCode
+        let agentId = validAgent.map { "agent:\($0):\(sessionId)" } ?? "cc:\(sessionId)"
+        let displayName = validAgent.map { "\(projectName) · \($0)" } ?? projectName
 
         let tool = payload["tool_name"] as? String ?? "Tool"
         var command = tool
@@ -375,11 +371,7 @@ final class HookServer: @unchecked Sendable {
         activeSessionId = sessionId
         approvalAgentId = agentId
 
-        if let agent = validAgent {
-            upsertExternalAgent(id: agentId, name: agent)
-        } else {
-            upsertTask(projectName: projectName, cwd: cwd)
-        }
+        upsertSession(id: agentId, name: displayName, source: source, cwd: cwd)
         state.updateTask(id: agentId, state: .approval)
         state.pendingApproval = ApprovalInfo(sessionId: sessionId, tool: tool, command: command)
         state.isPinned = true
@@ -426,15 +418,6 @@ final class HookServer: @unchecked Sendable {
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
 
-    /// Updates integration_claude with the current session project name and cwd.
-    @MainActor
-    private func upsertTask(projectName: String, cwd: String = "") {
-        let state = AppState.shared
-        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) else { return }
-        state.tasks[idx].name = projectName
-        if !cwd.isEmpty { state.tasks[idx].sessionCwd = cwd }
-    }
-
     // MARK: - Badge helpers
 
     @MainActor
@@ -448,17 +431,6 @@ final class HookServer: @unchecked Sendable {
     private func clearPillBadge(id: String) {
         let state = AppState.shared
         guard let idx = state.tasks.firstIndex(where: { $0.id == id }) else { return }
-        state.tasks[idx].pillBadge = nil
-    }
-
-    /// Resets integration_claude to idle, clears steps and project name.
-    @MainActor
-    private func clearSession() {
-        let state = AppState.shared
-        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) else { return }
-        state.tasks[idx].steps = []
-        state.tasks[idx].stepIndex = 0
-        state.tasks[idx].name = "VS Code"
         state.tasks[idx].pillBadge = nil
     }
 
