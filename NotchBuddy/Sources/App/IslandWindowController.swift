@@ -365,7 +365,7 @@ final class IslandWindowController: NSWindowController {
         guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
         let (w, h) = islandSize(mode: state.mode, view: state.view,
                                 progress: state.uploadProgress, nw: notchW, nh: notchH,
-                                vertical: state.islandEdge.isVertical)
+                                vertical: state.islandEdge.isVertical, agentCount: state.tasks.count)
         let dTop = f.maxY - m.y, dBot = m.y - f.minY, dLeft = m.x - f.minX, dRight = f.maxX - m.x
         let minD = min(dTop, dBot, dLeft, dRight)
         let edge: IslandEdge = minD == dLeft ? .left : (minD == dRight ? .right : (minD == dTop ? .top : .bottom))
@@ -386,7 +386,7 @@ final class IslandWindowController: NSWindowController {
         guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
         let (w, h) = islandSize(mode: state.mode, view: state.view,
                                 progress: state.uploadProgress, nw: notchW, nh: notchH,
-                                vertical: state.islandEdge.isVertical)
+                                vertical: state.islandEdge.isVertical, agentCount: state.tasks.count)
         let maxOff = state.islandEdge.isVertical ? max(0, (f.height - h) / 2)
                                                  : max(0, (f.width - w) / 2)
         let cur = state.islandXOffset
@@ -786,7 +786,7 @@ final class IslandWindowController: NSWindowController {
         let panelW = window?.frame.width  ?? 720
         let (islandW, fixedH) = islandSize(mode: s.mode, view: s.view,
                                             progress: s.uploadProgress, nw: notchW, nh: notchH,
-                                            vertical: s.islandEdge.isVertical)
+                                            vertical: s.islandEdge.isVertical, agentCount: s.tasks.count)
         // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
@@ -853,7 +853,7 @@ final class IslandPanel: NSPanel {
         let s = AppState.shared
         let (w, fixedH) = islandSize(mode: s.mode, view: s.view,
                                       progress: s.uploadProgress, nw: nw, nh: nh,
-                                      vertical: s.islandEdge.isVertical)
+                                      vertical: s.islandEdge.isVertical, agentCount: s.tasks.count)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
             let base: CGFloat = 240
@@ -918,13 +918,16 @@ func islandSize(mode: IslandMode, view: IslandView,
                 progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
                 nh: CGFloat = IslandConst.notchHeight,
-                vertical: Bool = false) -> (CGFloat, CGFloat) {
+                vertical: Bool = false,
+                agentCount: Int = 1) -> (CGFloat, CGFloat) {
     if vertical {
-        // Upright vertical bar docked to a left/right edge.
+        // Upright vertical bar docked to a left/right edge — fits its content so there
+        // is no big empty slab below the sessions.
+        let n = CGFloat(max(1, min(4, agentCount)))
         switch mode {
-        case .hidden:   return (40, 120)
-        case .compact:  return (64, 210)
-        case .expanded: return (300, 440)
+        case .hidden:   return (46, 56 + (n - 1) * 44)
+        case .compact:  return (58, 20 + n * 44)
+        case .expanded: return (248, 16 + n * 60 + (n - 1) * 8)
         }
     }
     switch mode {

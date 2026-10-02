@@ -1454,21 +1454,21 @@ extension Color {
 /// Used when the island is docked to a left/right edge (AppState.islandEdge.isVertical).
 struct VerticalIslandContainer: View {
     @ObservedObject var state: AppState
-    @State private var w: CGFloat = 64
-    @State private var h: CGFloat = 210
+    @State private var w: CGFloat = 58
+    @State private var h: CGFloat = 120
 
-    private var cornerR: CGFloat { state.mode == .expanded ? 24 : 18 }
+    private var cornerR: CGFloat { state.mode == .expanded ? 22 : 16 }
     private var tasks: [AgentTask] { Array(state.tasks.prefix(4)) }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerR, style: .continuous)
-        ZStack(alignment: .top) {
+        ZStack {
             if state.liquidGlass {
                 shape.fill(.clear)
                     .glassEffect(.regular.tint(Color.black.opacity(0.62)), in: shape)
             } else {
-                shape.fill(Color.black)
-                    .overlay(shape.stroke(Color.white.opacity(0.04), lineWidth: 1))
+                shape.fill(Color(hex: "#141518"))
+                    .overlay(shape.stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
 
             if state.mode == .expanded {
@@ -1479,63 +1479,74 @@ struct VerticalIslandContainer: View {
                             SoundEngine.shared.play("blip")
                         }
                     }
-                    Spacer(minLength: 0)
                 }
-                .padding(10)
+                .padding(8)
             } else {
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     ForEach(tasks) { task in
                         MiniBotCanvasView(task: task)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 32, height: 32)
                     }
                 }
-                .padding(.vertical, 14)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(width: w, height: h, alignment: .top)
+        .frame(width: w, height: h)
         .onChange(of: state.mode) { _, _ in resize() }
+        .onChange(of: state.tasks.count) { _, _ in resize() }
         .onAppear { resize() }
     }
 
     private func resize() {
         let (nw, nh) = islandSize(mode: state.mode, view: state.view,
-                                  nw: state.notchWidth, nh: state.notchHeight, vertical: true)
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.68)) { w = nw; h = nh }
+                                  nw: state.notchWidth, nh: state.notchHeight,
+                                  vertical: true, agentCount: state.tasks.count)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { w = nw; h = nh }
     }
 }
 
-/// One agent session as a row in the vertical bar: mini Mochi + name + latest status.
+/// One agent session as a clean card in the vertical bar: mini Mochi + name + status.
 struct VerticalAgentRow: View {
     let task: AgentTask
     let focused: Bool
     let onTap: () -> Void
 
+    private var sourceLabel: String {
+        switch task.source {
+        case .claudeCode: return "Claude Code"
+        case .agent:      return "Agent"
+        case .n8n:        return "n8n"
+        }
+    }
+
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    MiniBotCanvasView(task: task)
-                        .frame(width: 26, height: 26)
+            HStack(spacing: 9) {
+                MiniBotCanvasView(task: task)
+                    .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(task.name)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#F5F6F8"))
                         .lineLimit(1).truncationMode(.tail)
-                    Spacer(minLength: 0)
-                }
-                if let step = task.steps.last, !step.isEmpty {
-                    Text(step)
-                        .font(.system(size: 10))
+                    Text((task.steps.last?.isEmpty == false) ? task.steps.last! : sourceLabel)
+                        .font(.system(size: 10.5))
                         .foregroundColor(Color(hex: "#9398A1"))
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1).truncationMode(.tail)
                 }
+                Spacer(minLength: 0)
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(focused ? 0.10 : 0.04))
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(focused ? 0.11 : 0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color(hex: task.color).opacity(focused ? 0.45 : 0), lineWidth: 1)
+                    )
             )
         }
         .buttonStyle(.plain)
