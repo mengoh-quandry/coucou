@@ -432,12 +432,13 @@ final class IslandWindowController: NSWindowController {
                 self.hoverTimer?.cancel()
                 self.botHoverTimer?.cancel()
                 self.botHovering = false
-                // Drag only starts when clicking directly on the bot head
-                guard self.isBotHit(event.locationInWindow) else { return }
+                // Drag can start anywhere on the island: press-and-move repositions it,
+                // press-and-release (no move) is still a click/open.
                 self.attachDragStart = NSEvent.mouseLocation
-                // Post slap only when expanded
-                guard self.state.mode == .expanded else { return }
-                NotificationCenter.default.post(name: .triggerSlap, object: nil)
+                // Poking the bot head (expanded) still slaps.
+                if self.state.mode == .expanded, self.isBotHit(event.locationInWindow) {
+                    NotificationCenter.default.post(name: .triggerSlap, object: nil)
+                }
             }
             return event
         }
