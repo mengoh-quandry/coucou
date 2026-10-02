@@ -35,6 +35,15 @@ struct OverviewView: View {
     @ObservedObject var state: AppState
 
     var agent: AgentTask? { state.focusTask }
+    private var secondAgent: AgentTask? { state.tasks.first { $0.id != state.focusId } }
+    private var extraCount: Int { max(0, state.tasks.count - 2) }
+    private func sourceLabel(_ t: AgentTask) -> String {
+        switch t.source {
+        case .claudeCode: return "Claude Code"
+        case .agent:      return "Agent"
+        case .n8n:        return "n8n"
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -102,11 +111,80 @@ struct OverviewView: View {
                 .padding(.trailing, 10)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(width: 322)
+            .frame(maxWidth: .infinity)
 
-            // Right card: agent pills
-            CardBackground(wash: nil) {
-                AgentPillsView(state: state)
+            // Right box: the second session, same detail format (or a placeholder).
+            ZStack(alignment: .topLeading) {
+                CardBackground(wash: nil)
+
+                if let second = secondAgent {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color(hex: second.color))
+                                .frame(width: 7, height: 7)
+                            Text(second.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color(hex: "#F5F6F8"))
+                                .lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                            Text(sourceLabel(second))
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(hex: "#8E939C"))
+                                .lineLimit(1).truncationMode(.tail)
+                            Spacer(minLength: 2)
+                            if extraCount > 0 {
+                                Text("+\(extraCount)")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(Color(hex: "#9398A1"))
+                                    .padding(.horizontal, 5).padding(.vertical, 1)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Capsule())
+                            } else if second.steps.count > 1 {
+                                Text("\(min(second.stepIndex + 1, second.steps.count))/\(second.steps.count)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color(hex: "#6B7079"))
+                                    .fixedSize()
+                            }
+                        }
+                        .padding(.top, 6)
+                        .padding(.leading, 16)
+                        .padding(.trailing, 36)
+
+                        TickerView(task: second)
+                            .frame(height: 44)
+                            .padding(.top, 6)
+                            .padding(.leading, 16)
+                            .padding(.trailing, 12)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.top, 4)
+
+                    Button(action: { openAgentTarget(second) }) {
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .frame(width: 16, height: 16)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
+                    .padding(.trailing, 10)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                } else {
+                    Text("No other session")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "#6B7079"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if let s = secondAgent {
+                    state.setFocus(s.id)
+                    SoundEngine.shared.play("blip")
+                }
             }
         }
     }
