@@ -36,7 +36,8 @@ struct IslandContainer: View {
 
     private let openSpring = Animation.spring(response: 0.5, dampingFraction: 0.72)
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
-    private let dropletSpring = Animation.spring(response: 0.52, dampingFraction: 0.58)
+    // Bouncy, loose spring so the morph reads as liquid rather than a stiff resize.
+    private let dropletSpring = Animation.spring(duration: 0.6, bounce: 0.46)
 
     private var chatPromptHeight: CGFloat {
         let base: CGFloat = 240
@@ -136,7 +137,7 @@ struct IslandContainer: View {
         .frame(width: islandWidth, height: islandHeight, alignment: .topLeading)
         // Droplet morph: anchored at the notch, the island briefly stretches down
         // and pinches in, then settles — a liquid "drop" forming on expand.
-        .scaleEffect(x: 1 - dropletPhase * 0.05, y: 1 + dropletPhase * 0.13, anchor: .top)
+        .scaleEffect(x: 1 - dropletPhase * 0.08, y: 1 + dropletPhase * 0.18, anchor: .top)
         .onChange(of: state.mode) { oldMode, newMode in
             let shrinking = modeOrder(newMode) < modeOrder(oldMode)
             let expanding = newMode == .expanded && !shrinking

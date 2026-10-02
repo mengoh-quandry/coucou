@@ -31,6 +31,7 @@ final class IslandWindowController: NSWindowController {
 
     // Window attach drag (M8)
     private var attachDragStart: NSPoint? = nil
+    private var dragLastX: CGFloat = 0
     private var pendingIslandClick = false   // any island click → expand on mouseUp
     private var inAttachDrag = false
     private var dragGhostPanel: NSPanel? = nil
@@ -356,6 +357,32 @@ final class IslandWindowController: NSWindowController {
         window?.resignKey()
     }
 
+    // MARK: - Drag to reposition (snaps to a screen edge)
+
+    /// Max horizontal offset that keeps the island fully on screen.
+    private func maxIslandOffset() -> CGFloat {
+        guard let panel = window as? IslandPanel, let screen = panel.screen else { return 0 }
+        let w = panel.currentIslandFrame(nw: notchW, nh: notchH).width
+        return max(0, (screen.frame.width - w) / 2)
+    }
+
+    /// Live-move the island with the cursor during a drag (clamped to the edges).
+    private func moveIsland(byX dx: CGFloat) {
+        let maxOff = maxIslandOffset()
+        state.islandXOffset = min(maxOff, max(-maxOff, state.islandXOffset + dx))
+    }
+
+    /// On release, snap to the nearest of: left edge, centre (notch), right edge.
+    private func snapIslandToEdge() {
+        let maxOff = maxIslandOffset()
+        let cur = state.islandXOffset
+        let target: CGFloat = cur < -maxOff * 0.33 ? -maxOff
+                            : (cur > maxOff * 0.33 ? maxOff : 0)
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+            state.islandXOffset = target
+        }
+    }
+
     // MARK: - Keyboard (Escape closes)
 
     private func startKeyMonitor() {
@@ -415,12 +442,19 @@ final class IslandWindowController: NSWindowController {
         NSEvent.addLocalMonitorForEvents(matching: .leftMouseDragged) { [weak self] event in
             guard let self else { return event }
             MainActor.assumeIsolated {
-                guard let start = self.attachDragStart, !self.inAttachDrag else { return }
+                guard let start = self.attachDragStart else { return }
                 let m = NSEvent.mouseLocation
-                guard hypot(m.x - start.x, m.y - start.y) > 3 else { return }
-                self.inAttachDrag = true
-                NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.love)
-                self.showDragGhost()
+                if !self.inAttachDrag {
+                    guard hypot(m.x - start.x, m.y - start.y) > 3 else { return }
+                    self.inAttachDrag = true
+                    self.dragLastX = m.x
+                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.love)
+                }
+                // Drag the whole island horizontally; it follows the cursor and
+                // snaps to a screen edge (or centre) on release.
+                let dx = m.x - self.dragLastX
+                self.dragLastX = m.x
+                self.moveIsland(byX: dx)
             }
             return event
         }
@@ -429,13 +463,10 @@ final class IslandWindowController: NSWindowController {
         let finishDrag: @Sendable () -> Void = { [weak self] in
             Task { @MainActor in
                 guard let self, self.inAttachDrag else { return }
-                let mouse = NSEvent.mouseLocation
                 self.inAttachDrag = false
                 self.attachDragStart = nil
                 self.state.stateOverride = nil
-                self.hideDragGhost()
-                // Window-attach fed the (now removed) chat, so dropping just resets.
-                _ = mouse
+                self.snapIslandToEdge()
             }
         }
         NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
