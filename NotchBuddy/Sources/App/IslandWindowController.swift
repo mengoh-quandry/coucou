@@ -52,13 +52,11 @@ final class IslandWindowController: NSWindowController {
         let nH = geometry.height
 
         let sf = screen.frame
-        // Full-width panel so the island can be dragged to either screen edge without
-        // being clipped by the panel bounds. It stays click-through except over the island.
-        let panelW: CGFloat = sf.width
-        let panelH: CGFloat = 320
+        // Full-screen transparent, click-through panel so the island can be dragged to
+        // and docked at ANY screen edge without being clipped. It stays click-through
+        // except over the island itself (toggled in pollFrame).
         let panel = IslandPanel(
-            contentRect: NSRect(x: sf.midX - panelW/2, y: sf.maxY - panelH,
-                                width: panelW, height: panelH),
+            contentRect: sf,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: false
         )
@@ -359,24 +357,36 @@ final class IslandWindowController: NSWindowController {
         window?.resignKey()
     }
 
-    // MARK: - Drag to reposition (snaps to a screen edge)
+    // MARK: - Drag to reposition (docks to any screen edge)
 
-    /// Max horizontal offset that keeps the island fully on screen.
-    private func maxIslandOffset() -> CGFloat {
-        guard let panel = window as? IslandPanel, let screen = panel.screen else { return 0 }
-        let w = panel.currentIslandFrame(nw: notchW, nh: notchH).width
-        return max(0, (screen.frame.width - w) / 2)
+    /// Live-drag: re-dock to whichever screen edge the cursor is nearest, and move
+    /// the island along that edge to follow the cursor (clamped on-screen).
+    private func dragIslandTo(cursor m: NSPoint) {
+        guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
+        let (w, h) = islandSize(mode: state.mode, view: state.view,
+                                progress: state.uploadProgress, nw: notchW, nh: notchH)
+        let dTop = f.maxY - m.y, dBot = m.y - f.minY, dLeft = m.x - f.minX, dRight = f.maxX - m.x
+        let minD = min(dTop, dBot, dLeft, dRight)
+        let edge: IslandEdge = minD == dLeft ? .left : (minD == dRight ? .right : (minD == dTop ? .top : .bottom))
+        state.islandEdge = edge
+        switch edge {
+        case .top, .bottom:
+            let maxOff = max(0, (f.width - w) / 2)
+            state.islandXOffset = min(maxOff, max(-maxOff, m.x - f.midX))
+        case .left, .right:
+            let maxOff = max(0, (f.height - h) / 2)
+            let cy = m.y - f.minY
+            state.islandXOffset = min(maxOff, max(-maxOff, f.height / 2 - cy))
+        }
     }
 
-    /// Live-move the island with the cursor during a drag (clamped to the edges).
-    private func moveIsland(byX dx: CGFloat) {
-        let maxOff = maxIslandOffset()
-        state.islandXOffset = min(maxOff, max(-maxOff, state.islandXOffset + dx))
-    }
-
-    /// On release, snap to the nearest of: left edge, centre (notch), right edge.
+    /// On release, snap the along-edge offset to the nearest of: start / centre / end.
     private func snapIslandToEdge() {
-        let maxOff = maxIslandOffset()
+        guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
+        let (w, h) = islandSize(mode: state.mode, view: state.view,
+                                progress: state.uploadProgress, nw: notchW, nh: notchH)
+        let maxOff = state.islandEdge.isVertical ? max(0, (f.height - h) / 2)
+                                                 : max(0, (f.width - w) / 2)
         let cur = state.islandXOffset
         let target: CGFloat = cur < -maxOff * 0.33 ? -maxOff
                             : (cur > maxOff * 0.33 ? maxOff : 0)
@@ -453,11 +463,9 @@ final class IslandWindowController: NSWindowController {
                     self.dragLastX = m.x
                     NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.love)
                 }
-                // Drag the whole island horizontally; it follows the cursor and
-                // snaps to a screen edge (or centre) on release.
-                let dx = m.x - self.dragLastX
-                self.dragLastX = m.x
-                self.moveIsland(byX: dx)
+                // Drag the whole island; it re-docks to the nearest screen edge and
+                // follows the cursor, snapping along the edge on release.
+                self.dragIslandTo(cursor: m)
             }
             return event
         }
@@ -850,7 +858,14 @@ final class IslandPanel: NSPanel {
         } else {
             h = fixedH
         }
-        return CGRect(x: (frame.width - w) / 2 + s.islandXOffset, y: frame.height - h, width: w, height: h)
+        let W = frame.width, H = frame.height
+        let off = s.islandXOffset
+        switch s.islandEdge {
+        case .top:    return CGRect(x: (W - w)/2 + off, y: H - h,          width: w, height: h)
+        case .bottom: return CGRect(x: (W - w)/2 + off, y: 0,              width: w, height: h)
+        case .left:   return CGRect(x: 0,               y: (H - h)/2 - off, width: w, height: h)
+        case .right:  return CGRect(x: W - w,           y: (H - h)/2 - off, width: w, height: h)
+        }
     }
 }
 

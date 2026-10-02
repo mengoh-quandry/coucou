@@ -113,7 +113,13 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(expandOnHover, forKey: "expandOnHover") }
     }
 
-    // Horizontal offset of the island from notch center, in points — persisted
+    // Which screen edge the island is docked to — persisted
+    @Published var islandEdge: IslandEdge = .top {
+        didSet { UserDefaults.standard.set(islandEdge.rawValue, forKey: "islandEdge") }
+    }
+
+    // Offset of the island along its docked edge, in points — persisted.
+    // Top/bottom: horizontal offset from center. Left/right: vertical offset from center.
     @Published var islandXOffset: CGFloat = 0 {
         didSet { UserDefaults.standard.set(Double(islandXOffset), forKey: "islandXOffset") }
     }
@@ -143,6 +149,7 @@ final class AppState: ObservableObject {
         if let v = ud.object(forKey: "hotkeyFlags")   as? Int   { hotkeyFlags = UInt(v) }
         if let v = ud.object(forKey: "hotkeyCode")    as? Int   { hotkeyCode = UInt16(v) }
         if let v = ud.object(forKey: "expandOnHover") as? Bool  { expandOnHover = v }
+        if let v = ud.string(forKey: "islandEdge"), let e = IslandEdge(rawValue: v) { islandEdge = e }
         if let v = ud.object(forKey: "islandXOffset") as? Double { islandXOffset = CGFloat(v) }
         if let v = ud.object(forKey: "liquidGlass")   as? Bool  { liquidGlass = v }
 

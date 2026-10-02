@@ -7,13 +7,27 @@ import SwiftUI
 struct IslandRootView: View {
     @EnvironmentObject var state: AppState
 
+    private var edgeAlignment: Alignment {
+        switch state.islandEdge {
+        case .top:    return .top
+        case .bottom: return .bottom
+        case .left:   return .leading
+        case .right:  return .trailing
+        }
+    }
+    private var edgeOffset: CGSize {
+        switch state.islandEdge {
+        case .top, .bottom: return CGSize(width: state.islandXOffset, height: 0)
+        case .left, .right: return CGSize(width: 0, height: state.islandXOffset)
+        }
+    }
+
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: edgeAlignment) {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             IslandContainer(state: state)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .offset(x: state.islandXOffset)
+                .offset(edgeOffset)
         }
         .ignoresSafeArea()
     }

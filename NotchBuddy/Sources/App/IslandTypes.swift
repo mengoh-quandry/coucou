@@ -6,6 +6,14 @@ enum IslandMode: String, CaseIterable {
     case hidden, compact, expanded
 }
 
+// MARK: - Island Edge (which screen side the island is docked to)
+
+enum IslandEdge: String, CaseIterable {
+    case top, bottom, left, right
+    /// Left/right use the upright vertical layout; top/bottom use the horizontal one.
+    var isVertical: Bool { self == .left || self == .right }
+}
+
 // MARK: - Island View
 
 enum IslandView: String, CaseIterable {
