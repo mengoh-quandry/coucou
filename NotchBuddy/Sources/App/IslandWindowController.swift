@@ -51,9 +51,11 @@ final class IslandWindowController: NSWindowController {
         let nW = geometry.width
         let nH = geometry.height
 
-        let panelW: CGFloat = 720
-        let panelH: CGFloat = 320
         let sf = screen.frame
+        // Full-width panel so the island can be dragged to either screen edge without
+        // being clipped by the panel bounds. It stays click-through except over the island.
+        let panelW: CGFloat = sf.width
+        let panelH: CGFloat = 320
         let panel = IslandPanel(
             contentRect: NSRect(x: sf.midX - panelW/2, y: sf.maxY - panelH,
                                 width: panelW, height: panelH),
