@@ -150,7 +150,12 @@ final class AppState: ObservableObject {
         if let v = ud.object(forKey: "hotkeyCode")    as? Int   { hotkeyCode = UInt16(v) }
         if let v = ud.object(forKey: "expandOnHover") as? Bool  { expandOnHover = v }
         if let v = ud.string(forKey: "islandEdge"), let e = IslandEdge(rawValue: v) { islandEdge = e }
-        if let v = ud.object(forKey: "islandXOffset") as? Double { islandXOffset = CGFloat(v) }
+        if let v = ud.object(forKey: "islandXOffset") as? Double {
+            // Guard against a stale/off-screen offset: never load one bigger than the
+            // largest screen dimension (a bad drag once saved -2752, hiding the island).
+            let limit = (NSScreen.screens.map { max($0.frame.width, $0.frame.height) }.max() ?? 2000)
+            islandXOffset = abs(v) > limit ? 0 : CGFloat(v)
+        }
         if let v = ud.object(forKey: "liquidGlass")   as? Bool  { liquidGlass = v }
 
         // Sync SoundEngine volume on launch
