@@ -26,8 +26,14 @@ struct IslandRootView: View {
         ZStack(alignment: edgeAlignment) {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            IslandContainer(state: state)
-                .offset(edgeOffset)
+            Group {
+                if state.islandEdge.isVertical {
+                    VerticalIslandContainer(state: state)
+                } else {
+                    IslandContainer(state: state)
+                }
+            }
+            .offset(edgeOffset)
         }
         .ignoresSafeArea()
     }
@@ -81,7 +87,7 @@ struct IslandContainer: View {
                 IslandShape(width: islandWidth, height: islandHeight,
                             cornerRadius: cornerRadius, topRadius: islandTopRadius)
                     .fill(.clear)
-                    .glassEffect(.regular.tint(Color.black.opacity(0.45)),
+                    .glassEffect(.regular.tint(Color.black.opacity(0.62)),
                                  in: IslandShape(width: islandWidth, height: islandHeight,
                                                  cornerRadius: cornerRadius, topRadius: islandTopRadius))
             } else {

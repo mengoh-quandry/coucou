@@ -364,7 +364,8 @@ final class IslandWindowController: NSWindowController {
     private func dragIslandTo(cursor m: NSPoint) {
         guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
         let (w, h) = islandSize(mode: state.mode, view: state.view,
-                                progress: state.uploadProgress, nw: notchW, nh: notchH)
+                                progress: state.uploadProgress, nw: notchW, nh: notchH,
+                                vertical: state.islandEdge.isVertical)
         let dTop = f.maxY - m.y, dBot = m.y - f.minY, dLeft = m.x - f.minX, dRight = f.maxX - m.x
         let minD = min(dTop, dBot, dLeft, dRight)
         let edge: IslandEdge = minD == dLeft ? .left : (minD == dRight ? .right : (minD == dTop ? .top : .bottom))
@@ -384,7 +385,8 @@ final class IslandWindowController: NSWindowController {
     private func snapIslandToEdge() {
         guard let f = (window?.screen ?? NSScreen.main)?.frame else { return }
         let (w, h) = islandSize(mode: state.mode, view: state.view,
-                                progress: state.uploadProgress, nw: notchW, nh: notchH)
+                                progress: state.uploadProgress, nw: notchW, nh: notchH,
+                                vertical: state.islandEdge.isVertical)
         let maxOff = state.islandEdge.isVertical ? max(0, (f.height - h) / 2)
                                                  : max(0, (f.width - w) / 2)
         let cur = state.islandXOffset
@@ -783,7 +785,8 @@ final class IslandWindowController: NSWindowController {
         let panelH = window?.frame.height ?? 320
         let panelW = window?.frame.width  ?? 720
         let (islandW, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                            progress: s.uploadProgress, nw: notchW, nh: notchH)
+                                            progress: s.uploadProgress, nw: notchW, nh: notchH,
+                                            vertical: s.islandEdge.isVertical)
         // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
@@ -849,7 +852,8 @@ final class IslandPanel: NSPanel {
     func currentIslandFrame(nw: CGFloat, nh: CGFloat) -> CGRect {
         let s = AppState.shared
         let (w, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                      progress: s.uploadProgress, nw: nw, nh: nh)
+                                      progress: s.uploadProgress, nw: nw, nh: nh,
+                                      vertical: s.islandEdge.isVertical)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
             let base: CGFloat = 240
@@ -913,7 +917,16 @@ extension Notification.Name {
 func islandSize(mode: IslandMode, view: IslandView,
                 progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
-                nh: CGFloat = IslandConst.notchHeight) -> (CGFloat, CGFloat) {
+                nh: CGFloat = IslandConst.notchHeight,
+                vertical: Bool = false) -> (CGFloat, CGFloat) {
+    if vertical {
+        // Upright vertical bar docked to a left/right edge.
+        switch mode {
+        case .hidden:   return (40, 120)
+        case .compact:  return (64, 210)
+        case .expanded: return (300, 440)
+        }
+    }
     switch mode {
     case .hidden:   return (nw, nh)
     case .compact:  return (nw + 160, nh)

@@ -1447,3 +1447,97 @@ extension Color {
         )
     }
 }
+
+// MARK: - Vertical island (docked to the left/right edge)
+
+/// Upright vertical bar: Mochi + agent sessions stacked top-to-bottom, text upright.
+/// Used when the island is docked to a left/right edge (AppState.islandEdge.isVertical).
+struct VerticalIslandContainer: View {
+    @ObservedObject var state: AppState
+    @State private var w: CGFloat = 64
+    @State private var h: CGFloat = 210
+
+    private var cornerR: CGFloat { state.mode == .expanded ? 24 : 18 }
+    private var tasks: [AgentTask] { Array(state.tasks.prefix(4)) }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerR, style: .continuous)
+        ZStack(alignment: .top) {
+            if state.liquidGlass {
+                shape.fill(.clear)
+                    .glassEffect(.regular.tint(Color.black.opacity(0.62)), in: shape)
+            } else {
+                shape.fill(Color.black)
+                    .overlay(shape.stroke(Color.white.opacity(0.04), lineWidth: 1))
+            }
+
+            if state.mode == .expanded {
+                VStack(spacing: 8) {
+                    ForEach(tasks) { task in
+                        VerticalAgentRow(task: task, focused: task.id == state.focusId) {
+                            state.setFocus(task.id)
+                            SoundEngine.shared.play("blip")
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(10)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(tasks) { task in
+                        MiniBotCanvasView(task: task)
+                            .frame(width: 34, height: 34)
+                    }
+                }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(width: w, height: h, alignment: .top)
+        .onChange(of: state.mode) { _, _ in resize() }
+        .onAppear { resize() }
+    }
+
+    private func resize() {
+        let (nw, nh) = islandSize(mode: state.mode, view: state.view,
+                                  nw: state.notchWidth, nh: state.notchHeight, vertical: true)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.68)) { w = nw; h = nh }
+    }
+}
+
+/// One agent session as a row in the vertical bar: mini Mochi + name + latest status.
+struct VerticalAgentRow: View {
+    let task: AgentTask
+    let focused: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    MiniBotCanvasView(task: task)
+                        .frame(width: 26, height: 26)
+                    Text(task.name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color(hex: "#F5F6F8"))
+                        .lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 0)
+                }
+                if let step = task.steps.last, !step.isEmpty {
+                    Text(step)
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#9398A1"))
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(focused ? 0.10 : 0.04))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
