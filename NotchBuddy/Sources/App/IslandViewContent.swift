@@ -1524,29 +1524,42 @@ struct VerticalAgentBox: View {
 
     var body: some View {
         Button(action: onTap) {
+            // Same structure as the horizontal box: Mochi on the left, a name/source
+            // header row, and the scrolling ticker below it.
             ZStack(alignment: .topLeading) {
                 CardBackground(wash: nil)
-                HStack(spacing: 10) {
-                    MiniBotCanvasView(task: task)
-                        .frame(width: 44, height: 44)
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(task.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color(hex: "#F5F6F8"))
-                                .lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                            Text(sourceLabel)
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "#8E939C"))
-                                .lineLimit(1).truncationMode(.tail)
-                        }
-                        TickerView(task: task)
-                            .frame(height: 30)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color(hex: task.color))
+                            .frame(width: 7, height: 7)
+                        Text(task.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color(hex: "#F5F6F8"))
+                            .lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                        Text(sourceLabel)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                            .lineLimit(1).truncationMode(.tail)
+                        Spacer(minLength: 2)
                     }
-                    Spacer(minLength: 0)
+                    .padding(.top, 10)
+                    .padding(.leading, 64)
+                    .padding(.trailing, 12)
+
+                    TickerView(task: task)
+                        .frame(height: 30)
+                        .padding(.top, 4)
+                        .padding(.leading, 64)
+                        .padding(.trailing, 12)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+
+                // Mochi on the left, like the horizontal view.
+                MiniBotCanvasView(task: task)
+                    .frame(width: 44, height: 44)
+                    .padding(.leading, 12)
+                    .padding(.top, 14)
             }
             .frame(height: 72)
             .overlay(
