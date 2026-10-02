@@ -510,14 +510,14 @@ struct IslandHeader: View {
                 }) {
                     Image(systemName: state.view == .settings ? "gearshape.fill" : "gearshape")
                         .font(.system(size: 14))
-                        .foregroundColor(state.view == .settings ? Color(hex: "#F5F6F8") : Color(hex: "#8E939C"))
+                        .foregroundColor(state.view == .settings ? Color(hex: "#FFFFFF") : Color(hex: "#C6CBD4"))
                 }
                 .buttonStyle(.plain)
 
                 Button(action: { state.soundEnabled.toggle() }) {
                     Image(systemName: state.soundEnabled ? "speaker.wave.2" : "speaker.slash")
                         .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "#8E939C"))
+                        .foregroundColor(Color(hex: "#C6CBD4"))
                 }
                 .buttonStyle(.plain)
             }
@@ -547,12 +547,14 @@ struct TabButton: View {
             }
         }) {
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(isOn ? Color(hex: "#F5F6F8") : (isHovered ? Color(hex: "#B0B5BE") : Color(hex: "#8E939C")))
+                .font(.system(size: 13, weight: .medium))
+                // Brighter on glass: dark grays vanished against Liquid Glass.
+                .foregroundColor(isOn ? Color(hex: "#FFFFFF") : (isHovered ? Color(hex: "#EDEFF3") : Color(hex: "#C6CBD4")))
                 .frame(width: 30, height: 22)
                 .background(
-                    isOn ? Color(hex: "#1D1F23") :
-                    isHovered ? Color.white.opacity(0.07) : Color.clear
+                    // Light translucent selection chip instead of a near-black pill.
+                    isOn ? Color.white.opacity(0.22) :
+                    isHovered ? Color.white.opacity(0.10) : Color.clear
                 )
                 .clipShape(Capsule())
         }
