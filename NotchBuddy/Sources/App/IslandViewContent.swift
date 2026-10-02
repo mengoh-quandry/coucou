@@ -1452,18 +1452,25 @@ extension Color {
 
 /// Upright vertical bar: Mochi + agent sessions stacked top-to-bottom, text upright.
 /// Used when the island is docked to a left/right edge (AppState.islandEdge.isVertical).
+
 struct VerticalIslandContainer: View {
     @ObservedObject var state: AppState
     @State private var w: CGFloat = 58
     @State private var h: CGFloat = 120
 
     private var cornerR: CGFloat { state.mode == .expanded ? 22 : 16 }
-    private var tasks: [AgentTask] { Array(state.tasks.prefix(4)) }
+    private let boxH: CGFloat = 72
+    private let pad: CGFloat = 10
+
+    /// Focused session first, then the rest — so the big Mochi always sits on the top box.
+    private var orderedTasks: [AgentTask] {
+        guard let f = state.focusTask else { return Array(state.tasks.prefix(4)) }
+        return Array(([f] + state.tasks.filter { $0.id != f.id }).prefix(4))
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerR, style: .continuous)
-        ZStack {
-            // Island background (same material as the horizontal view).
+        ZStack(alignment: .top) {
             if state.liquidGlass {
                 shape.fill(.clear)
                     .glassEffect(.regular.tint(Color.black.opacity(0.62)), in: shape)
@@ -1472,19 +1479,30 @@ struct VerticalIslandContainer: View {
             }
 
             if state.mode == .expanded {
-                // The horizontal view's detail boxes, stacked vertically.
+                let boxes = orderedTasks
                 VStack(spacing: 8) {
-                    ForEach(tasks) { task in
-                        VerticalAgentBox(task: task, focused: task.id == state.focusId) {
+                    ForEach(Array(boxes.enumerated()), id: \.element.id) { idx, task in
+                        VerticalAgentBox(task: task,
+                                         leadingInset: idx == 0 ? 108 : 16,
+                                         focused: idx == 0) {
                             state.setFocus(task.id)
                             SoundEngine.shared.play("blip")
                         }
                     }
                 }
-                .padding(10)
+                .padding(pad)
+
+                // The real big Mochi, overlaid on the top (focused) box — exactly like
+                // the horizontal view's left box.
+                if !boxes.isEmpty {
+                    BotPlacement(state: state, islandW: w - pad * 2, islandH: boxH)
+                        .frame(width: w - pad * 2, height: boxH)
+                        .offset(x: pad, y: pad)
+                        .allowsHitTesting(false)
+                }
             } else {
                 VStack(spacing: 8) {
-                    ForEach(tasks) { task in
+                    ForEach(orderedTasks) { task in
                         MiniBotCanvasView(task: task)
                             .frame(width: 32, height: 32)
                     }
@@ -1507,10 +1525,11 @@ struct VerticalIslandContainer: View {
     }
 }
 
-/// One session as a detail box — the SAME card as the horizontal two-box view
-/// (CardBackground + Mochi + name/source + scrolling ticker), used stacked.
+/// One session as a detail box — the exact horizontal box content (header + ticker).
+/// leadingInset 108 reserves room for the big Mochi (top/focused box); 16 for the rest.
 struct VerticalAgentBox: View {
     let task: AgentTask
+    let leadingInset: CGFloat
     let focused: Bool
     let onTap: () -> Void
 
@@ -1524,16 +1543,11 @@ struct VerticalAgentBox: View {
 
     var body: some View {
         Button(action: onTap) {
-            // Same structure as the horizontal box: Mochi on the left, a name/source
-            // header row, and the scrolling ticker below it.
             ZStack(alignment: .topLeading) {
                 CardBackground(wash: nil)
-
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color(hex: task.color))
-                            .frame(width: 7, height: 7)
+                        Circle().fill(Color(hex: task.color)).frame(width: 7, height: 7)
                         Text(task.name)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(Color(hex: "#F5F6F8"))
@@ -1545,21 +1559,15 @@ struct VerticalAgentBox: View {
                         Spacer(minLength: 2)
                     }
                     .padding(.top, 10)
-                    .padding(.leading, 64)
+                    .padding(.leading, leadingInset)
                     .padding(.trailing, 12)
 
                     TickerView(task: task)
                         .frame(height: 30)
                         .padding(.top, 4)
-                        .padding(.leading, 64)
+                        .padding(.leading, leadingInset)
                         .padding(.trailing, 12)
                 }
-
-                // Mochi on the left, like the horizontal view.
-                MiniBotCanvasView(task: task)
-                    .frame(width: 44, height: 44)
-                    .padding(.leading, 12)
-                    .padding(.top, 14)
             }
             .frame(height: 72)
             .overlay(
