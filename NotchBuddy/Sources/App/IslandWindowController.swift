@@ -925,9 +925,11 @@ func islandSize(mode: IslandMode, view: IslandView,
         // is no big empty slab below the sessions.
         let n = CGFloat(max(1, min(4, agentCount)))
         switch mode {
-        case .hidden:   return (46, 56 + (n - 1) * 44)
-        case .compact:  return (58, 20 + n * 44)
-        case .expanded: return (248, 16 + n * 60 + (n - 1) * 8)
+        case .hidden:   return (48, 60 + (n - 1) * 44)
+        case .compact:  return (60, 18 + n * 44)
+        // Stacked detail boxes (same look as the horizontal two-box view): each box
+        // is ~72 tall, plus 10pt outer padding and 8pt gaps.
+        case .expanded: return (300, 20 + n * 72 + (n - 1) * 8)
         }
     }
     switch mode {

@@ -1463,24 +1463,25 @@ struct VerticalIslandContainer: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerR, style: .continuous)
         ZStack {
+            // Island background (same material as the horizontal view).
             if state.liquidGlass {
                 shape.fill(.clear)
                     .glassEffect(.regular.tint(Color.black.opacity(0.62)), in: shape)
             } else {
-                shape.fill(Color(hex: "#141518"))
-                    .overlay(shape.stroke(Color.white.opacity(0.05), lineWidth: 1))
+                shape.fill(Color.black)
             }
 
             if state.mode == .expanded {
+                // The horizontal view's detail boxes, stacked vertically.
                 VStack(spacing: 8) {
                     ForEach(tasks) { task in
-                        VerticalAgentRow(task: task, focused: task.id == state.focusId) {
+                        VerticalAgentBox(task: task, focused: task.id == state.focusId) {
                             state.setFocus(task.id)
                             SoundEngine.shared.play("blip")
                         }
                     }
                 }
-                .padding(8)
+                .padding(10)
             } else {
                 VStack(spacing: 8) {
                     ForEach(tasks) { task in
@@ -1506,8 +1507,9 @@ struct VerticalIslandContainer: View {
     }
 }
 
-/// One agent session as a clean card in the vertical bar: mini Mochi + name + status.
-struct VerticalAgentRow: View {
+/// One session as a detail box — the SAME card as the horizontal two-box view
+/// (CardBackground + Mochi + name/source + scrolling ticker), used stacked.
+struct VerticalAgentBox: View {
     let task: AgentTask
     let focused: Bool
     let onTap: () -> Void
@@ -1522,31 +1524,34 @@ struct VerticalAgentRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 9) {
-                MiniBotCanvasView(task: task)
-                    .frame(width: 30, height: 30)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#F5F6F8"))
-                        .lineLimit(1).truncationMode(.tail)
-                    Text((task.steps.last?.isEmpty == false) ? task.steps.last! : sourceLabel)
-                        .font(.system(size: 10.5))
-                        .foregroundColor(Color(hex: "#9398A1"))
-                        .lineLimit(1).truncationMode(.tail)
+            ZStack(alignment: .topLeading) {
+                CardBackground(wash: nil)
+                HStack(spacing: 10) {
+                    MiniBotCanvasView(task: task)
+                        .frame(width: 44, height: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(task.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color(hex: "#F5F6F8"))
+                                .lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                            Text(sourceLabel)
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(hex: "#8E939C"))
+                                .lineLimit(1).truncationMode(.tail)
+                        }
+                        TickerView(task: task)
+                            .frame(height: 30)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.white.opacity(focused ? 0.11 : 0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color(hex: task.color).opacity(focused ? 0.45 : 0), lineWidth: 1)
-                    )
+            .frame(height: 72)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color(hex: task.color).opacity(focused ? 0.45 : 0), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
